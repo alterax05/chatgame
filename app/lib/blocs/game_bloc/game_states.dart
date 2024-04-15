@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class GameState extends Equatable {
+  final WebSocketChannel? webSocket;
   final bool connected;
   final String? playerName;
   final String? roomId;
@@ -8,6 +10,7 @@ class GameState extends Equatable {
   final int? requiredPlayers;
 
   const GameState({
+    this.webSocket,
     this.connected = false,
     this.playerName,
     this.roomId,
@@ -17,13 +20,16 @@ class GameState extends Equatable {
 
   @override
   List<Object?> get props => [
+        webSocket,
         connected,
         playerName,
         roomId,
         roomPlayers,
+        requiredPlayers,
       ];
 
   GameState copyWith({
+    WebSocketChannel? webSocket,
     bool? connected,
     String? playerName,
     String? roomId,
@@ -31,6 +37,7 @@ class GameState extends Equatable {
     int? requiredPlayers,
   }) {
     return GameState(
+      webSocket: webSocket ?? this.webSocket,
       connected: connected ?? this.connected,
       playerName: playerName ?? this.playerName,
       roomId: roomId ?? this.roomId,

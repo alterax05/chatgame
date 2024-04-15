@@ -22,9 +22,9 @@ class MyApp extends StatelessWidget {
           seedColor: Colors.blue,
         ),
         textTheme: ThemeData.light().textTheme.copyWith(
-              bodyLarge: TextStyle(fontSize: 18),
-              bodyMedium: TextStyle(fontSize: 16),
-              bodySmall: TextStyle(fontSize: 14),
+              bodyLarge: const TextStyle(fontSize: 18),
+              bodyMedium: const TextStyle(fontSize: 16),
+              bodySmall: const TextStyle(fontSize: 14),
             ),
       ),
       routerConfig: appRouter,
