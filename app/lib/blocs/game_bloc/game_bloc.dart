@@ -31,16 +31,16 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     await webSocket.ready;
 
     webSocket.stream.listen((eventData) {
-      final event = eventData as WebSocketEvent;
+      final event = WebSocketEvent.fromJson(eventData);
 
       // map received data to the corresponding bloc event
-      if (event.type == "connectStatusUpdate") {
+      if (event.type == EventType.connectStatusUpdate) {
         add(ConnectStatusUpdate.fromJson(event.data));
-      } else if (event.type == "gameStatusUpdate") {
+      } else if (event.type == EventType.gameStatusUpdate) {
         add(GameStatusUpdate.fromJson(event.data));
-      } else if (event.type == "turnStatusUpdate") {
+      } else if (event.type == EventType.turnStatusUpdate) {
         add(TurnStatusUpdate.fromJson(event.data));
-      } else if (event.type == "newMessageUpdate") {
+      } else if (event.type == EventType.newMessageUpdate) {
         add(NewMessageUpdate.fromJson(event.data));
       }
     });
@@ -65,7 +65,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     debugPrint("sending message");
 
     final webSocket = state.webSocket!;
-    webSocket.sink.add(WebSocketEvent("sendMessage", event.message));
+    webSocket.sink.add(WebSocketEvent(EventType.sendMessage, event.toJson()));
 
     debugPrint("sent message");
   }
