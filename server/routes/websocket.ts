@@ -17,13 +17,10 @@ const rateLimiter = new RateLimiterMemory(rateLimitingOptions);
 
 wsServer.on("connection", async (ws, request) => {
   if (!request.url) {
+    ws.send(JSON.stringify({ message: "invalid url" }));
     ws.close();
     return;
   }
-
-  // parse url to get query params
-  const { query } = UrlParser.parse(request.url, true);
-  const id = query.id;
 
   const ip = ClientFilterUtils.getIpRequest(request);
 
@@ -43,35 +40,25 @@ wsServer.on("connection", async (ws, request) => {
     return ws.close();
   }
 
-  // prevent access for clients without id
-  if (!id || typeof id !== "string") {
-    ws.send(JSON.stringify({ message: "id is required" }));
-    return ws.close();
-  }
-
-  // filter invalid ids -> the id already exists
-  if (wsService.getClient(id) != undefined) {
-    ws.send(JSON.stringify({ message: "invalid id" }));
-    return ws.close();
-  }
-
   // register client
-  const newClient = wsService.createClient(id, ws);
-  console.log("new connection with id: ", id);
+  const client = wsService.createClient(ws);
+  console.log("new connection with id: ", client.id);
 
   // handle zombie connections (clients that don't close the connection properly)
   const heartbeat = setInterval(() => {
-    newClient.ws.ping();
-    if (newClient.failedPings > 3) {
-      newClient.ws.terminate();
-      // wsService.removeClient(newClient, heartbeat, 1006);
-      console.log("Terminated connection with client: ", id);
+    client.ws.ping();
+    if (client.failedPings > 3) {
+      client.ws.terminate();
+      wsService.removeClient(client.id);
+      console.log("Terminated connection with client: ", client.id);
+      clearInterval(heartbeat);
     }
-    newClient.failedPings++;
+    client.failedPings++;
   }, 3000);
 
   // handle different type of messages
   ws.on("message", (message) => {
+    const id = client.id;
     const messageData = SocketUtils.parseMessage(message, id);
 
     if (!messageData) {
@@ -80,7 +67,11 @@ wsServer.on("connection", async (ws, request) => {
     }
 
     if (messageData.event === Event.Connect) {
-      return wsService.matchClient(id);
+      if('message' in messageData.data && typeof messageData.data != undefined) {
+        const firstName = messageData.data.message;
+        return wsService.matchClient(id, firstName);
+      }
+      
     }
 
     if (messageData.event === Event.Disconnect) {
@@ -101,13 +92,11 @@ wsServer.on("connection", async (ws, request) => {
   });
 
   ws.on("close", () => {
-    wsService.removeClient(id);
+    wsService.removeClient(client.id);
     clearInterval(heartbeat);
   });
 
   ws.on("pong", () => {
-    const client = wsService.getClient(id);
-    if (!client) return;
     client.failedPings = 0;
   });
 });

@@ -1,16 +1,16 @@
-import { Client } from "../types/socket";
+import { User } from "../types/types";
 import { fakerIT as faker } from "@faker-js/faker";
 class ChatRoom {
     public readonly id: string;
-    private users: Client[];
+    private users: User[];
 
-    constructor(clients: Client[]) {
+    constructor(clients: User[]) {
         this.id = `${faker.word.adjective()}-${faker.word.noun()}-${Math.floor(Math.random() * 1000) + 1}`;
         this.users = clients;
         this.users.forEach(user => user.room = this.id);
     }
 
-    removeUser(user: Client) {
+    removeUser(user: User) {
         const index = this.users.indexOf(user);
         if (index !== -1) {
             this.users.splice(index, 1);
@@ -62,7 +62,7 @@ class ChatRoomManager {
         this.rooms = [];
     }
 
-    createRoom(users: Client[]) {
+    createRoom(users: User[]) {
         const room = new ChatRoom(users);
         this.rooms.push(room);
         return room;
@@ -83,7 +83,7 @@ class ChatRoomManager {
         return this.rooms;
     }
 
-    findUserInChatrooms(userId: string): Client | undefined {
+    findUserInChatrooms(userId: string): User | undefined {
         for (const room of this.getAllRooms()) {
           const users = room.getUsers();
           const foundUser = users.find((user) => user.id === userId);

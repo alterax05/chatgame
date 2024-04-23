@@ -2,10 +2,12 @@ import { WebSocket } from "ws";
 import { Client, ClientMessage } from "../types/socket";
 import { ChatRoomManager } from "./room";
 import { ServerEvent } from "../utils/socketUtils";
+import { randomUUID } from "crypto";
+import { User } from "../types/types";
 
 class WebSocketService {
   private waitingRoom: Client[];
-  private matchMakingQueue: Client[];
+  private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
 
   constructor() {
@@ -22,24 +24,31 @@ class WebSocketService {
     });
   }
 
-  public createClient(id: string, ws: WebSocket) {
+  public createClient(ws: WebSocket) {
     const newClient: Client = {
-      id,
+      id: randomUUID(),
       ws,
-      room: "waiting-room",
-      failedPings: 0,
-      votes: 0,
-      hasVoted: false,
+      failedPings: 0
     };
 
     this.waitingRoom.push(newClient);
     return newClient;
   }
 
-  public matchClient(id: string) {
+  public matchClient(id: string, firstName: string) {
     const client = this.waitingRoom.find((client) => client.id === id);
     if (!client) return;
-    this.matchMakingQueue.push(client);
+
+    const user: User = {
+      ...client,
+      firstName,
+      room: "waitingRoom",
+      votes: 0,
+      hasVoted: false
+    }
+
+    this.matchMakingQueue.push(user);
+
     if(this.matchMakingQueue.length >= 4){
       const room = this.chatRoomManager.createRoom(this.matchMakingQueue.splice(0, 4));
       const message = { from: "server", event: ServerEvent.ConnectionStatus, data: { message: `Game started in room ${room.getId()}`}} as ClientMessage;
@@ -49,7 +58,9 @@ class WebSocketService {
     }
     else{
       const message = { from: "server", event: ServerEvent.ConnectionStatus, data: { message: `Missing players. Waiting for ${4 - this.matchMakingQueue.length} more players`}} as ClientMessage;
-      client.ws.send(JSON.stringify(message));
+      this.matchMakingQueue.forEach((client) =>{
+        client.ws.send(JSON.stringify(message));
+      });
     }
   }
 

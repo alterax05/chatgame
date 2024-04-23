@@ -1,13 +1,10 @@
 import { WebSocket } from "ws";
 import { messageScheme } from "../utils/socketUtils";
 
-export interface Client {
-  id: string;
+export interface Client{
   ws: WebSocket;
-  room: string;
   failedPings: number;
-  votes: number;
-  hasVoted: boolean;
+  id: string;
 }
 
 export type ClientMessage = typeof messageScheme._output;
