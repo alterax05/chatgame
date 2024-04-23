@@ -48,10 +48,9 @@ wsServer.on("connection", async (ws, request) => {
     ws.send(JSON.stringify({ message: "id is required" }));
     return ws.close();
   }
-  // TODO: prevent access for clients with already existing id
 
-  // filter invalid ids
-  if (!ClientFilterUtils.isValidId(id)) {
+  // filter invalid ids -> the id already exists
+  if (wsService.getClient(id) != undefined) {
     ws.send(JSON.stringify({ message: "invalid id" }));
     return ws.close();
   }
@@ -61,8 +60,6 @@ wsServer.on("connection", async (ws, request) => {
   console.log("new connection with id: ", id);
 
   // handle zombie connections (clients that don't close the connection properly)
-  //TODO: Re-enable heartbeat
-  /*
   const heartbeat = setInterval(() => {
     newClient.ws.ping();
     if (newClient.failedPings > 3) {
@@ -72,9 +69,6 @@ wsServer.on("connection", async (ws, request) => {
     }
     newClient.failedPings++;
   }, 3000);
-  */
-
-  // TODO: publish realtime data to clients subscribed to the topic
 
   // handle different type of messages
   ws.on("message", (message) => {
@@ -106,16 +100,15 @@ wsServer.on("connection", async (ws, request) => {
     return ws.send(JSON.stringify({ message: "Invalid message" }));
   });
 
-  ws.on("close", (code, reason) => {
-    // const client = wsService.getClient(id);
-    // if (!client || !wsService.isClientConnected(client)) return;
-    // wsService.removeClient(client, heartbeat, code);
+  ws.on("close", () => {
+    wsService.removeClient(id);
+    clearInterval(heartbeat);
   });
 
   ws.on("pong", () => {
-    // const client = wsService.getClient(id);
-    // if (!client) return;
-    // client.failedPings = 0;
+    const client = wsService.getClient(id);
+    if (!client) return;
+    client.failedPings = 0;
   });
 });
 

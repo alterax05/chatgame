@@ -62,6 +62,10 @@ class WebSocketService {
     if (!room) return;
     room.vote(id, votedClient);
   }
+
+  public getClient(id: string) {
+    return this.waitingRoom.find((client) => client.id === id);
+  }
 }
 
 export default WebSocketService;
