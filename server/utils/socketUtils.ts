@@ -9,6 +9,13 @@ export enum Event {
   Vote = "vote",
 }
 
+export enum ServerEvent {
+  ConnectionStatus = "connectionStatus",
+  GameStatus = "gameStatus",
+  TurnStatus = "turnStatus",
+  VoteStatus = "voteStatus",
+}
+
 export const messageScheme = z.object({
   from: z.string(),
   event: z.string(),
@@ -26,6 +33,7 @@ class SocketUtils {
       messageData.from = id;
       return messageData as ClientMessage;
     } catch (e) {
+      console.log(e);
       return null;
     }
   }

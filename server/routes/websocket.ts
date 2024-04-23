@@ -61,6 +61,8 @@ wsServer.on("connection", async (ws, request) => {
   console.log("new connection with id: ", id);
 
   // handle zombie connections (clients that don't close the connection properly)
+  //TODO: Re-enable heartbeat
+  /*
   const heartbeat = setInterval(() => {
     newClient.ws.ping();
     if (newClient.failedPings > 3) {
@@ -70,14 +72,13 @@ wsServer.on("connection", async (ws, request) => {
     }
     newClient.failedPings++;
   }, 3000);
+  */
 
   // TODO: publish realtime data to clients subscribed to the topic
 
   // handle different type of messages
   ws.on("message", (message) => {
     const messageData = SocketUtils.parseMessage(message, id);
-    // const client = wsService.getClient(id);
-    // if (!client) return;
 
     if (!messageData) {
       ws.send(JSON.stringify({ message: "Invalid message sintax" }));
@@ -85,15 +86,21 @@ wsServer.on("connection", async (ws, request) => {
     }
 
     if (messageData.event === Event.Connect) {
+      return wsService.matchClient(id);
     }
 
     if (messageData.event === Event.Disconnect) {
+      return wsService.removeClient(id);
     }
 
     if (messageData.event === Event.SendMessage) {
+      return wsService.forwardMessage(messageData);
     }
 
     if (messageData.event === Event.Vote) {
+    if ('vote' in messageData.data && typeof messageData.data != undefined) {
+        return wsService.vote(id, messageData.data.vote);
+      }
     }
 
     return ws.send(JSON.stringify({ message: "Invalid message" }));
