@@ -106,16 +106,22 @@ class ChatRoomManager {
     }
 
     removeUser(userId: string) {
+        let user: User | undefined;
+
         for(const room of this.getAllRooms()) {
             const users = room.getUsers();
             const foundUser = users.find((user) => user.id === userId);
+            console.log(foundUser);
             if (foundUser) {
+                user = foundUser;
                 room.removeUser(foundUser);
                 if (room.count() === 0) {
                     this.removeRoom(room.getId());
                 }
             }
         }
+
+        return user;
     }
 }
 

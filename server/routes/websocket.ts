@@ -57,7 +57,7 @@ wsServer.on("connection", async (ws, request) => {
   }, 3000);
 
   // handle different type of messages
-  ws.on("message", (message) => {
+  ws.on("message", message => {
     const id = client.id;
     const messageData = SocketUtils.parseMessage(message, id);
 
@@ -67,11 +67,10 @@ wsServer.on("connection", async (ws, request) => {
     }
 
     if (messageData.event === Event.Connect) {
-      if('message' in messageData.data && typeof messageData.data != undefined) {
-        const firstName = messageData.data.message;
-        return wsService.matchClient(id, firstName);
-      }
-      
+      const firstName = messageData.data.firstName;
+      if (!firstName) return;
+
+      return wsService.matchClient(id, firstName);
     }
 
     if (messageData.event === Event.Disconnect) {
@@ -83,9 +82,10 @@ wsServer.on("connection", async (ws, request) => {
     }
 
     if (messageData.event === Event.Vote) {
-    if ('vote' in messageData.data && typeof messageData.data != undefined) {
-        return wsService.vote(id, messageData.data.vote);
-      }
+      const vote = messageData.data.vote;
+      if (!vote) return;
+
+      return wsService.vote(id, vote);
     }
 
     return ws.send(JSON.stringify({ message: "Invalid message" }));

@@ -14,15 +14,17 @@ export enum ServerEvent {
   GameStatus = "gameStatus",
   TurnStatus = "turnStatus",
   VoteStatus = "voteStatus",
+  NewMessage = "newMessage",
 }
 
 export const messageScheme = z.object({
-  from: z.string(),
+  from: z.string().optional(),
   event: z.string(),
-  data: z.union([
-    z.object({ message: z.string() }),
-    z.object({ vote: z.string() }),
-  ]),
+  data: z.object({
+    firstName: z.string().optional(),
+    vote: z.string().optional(),
+    text: z.string().optional(),
+  }),
 });
 
 class SocketUtils {

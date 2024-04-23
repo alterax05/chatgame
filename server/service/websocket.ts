@@ -1,7 +1,7 @@
 import { WebSocket } from "ws";
 import { Client, ClientMessage } from "../types/socket";
 import { ChatRoomManager } from "./room";
-import { ServerEvent } from "../utils/socketUtils";
+import { Event, ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
 import { User } from "../types/types";
 
@@ -10,17 +10,38 @@ class WebSocketService {
   private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
 
+  ROOM_SIZE = 3;
+
   constructor() {
     this.waitingRoom = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
   }
   public forwardMessage(message: ClientMessage) {
+    if (!message.from) return;
+
     const room = this.chatRoomManager.findChatroomFromUser(message.from);
-    if (!room) return;
+    const user = this.chatRoomManager.findUserInChatrooms(message.from);
+
+    if (!room || !user) return;
     const players = room.getUsers();
-    players.forEach((player) => {
-      player.ws.send(JSON.stringify(message));
+
+    players.forEach(player => {
+      player.ws.send(
+        JSON.stringify({
+          data: {
+            message: {
+              id: randomUUID(),
+              author: {
+                id: user.id,
+                firstName: user.firstName,
+              },
+              text: message.data.text,
+            },
+          },
+          event: ServerEvent.NewMessage,
+        })
+      );
     });
   }
 
@@ -28,7 +49,7 @@ class WebSocketService {
     const newClient: Client = {
       id: randomUUID(),
       ws,
-      failedPings: 0
+      failedPings: 0,
     };
 
     this.waitingRoom.push(newClient);
@@ -36,36 +57,107 @@ class WebSocketService {
   }
 
   public matchClient(id: string, firstName: string) {
-    const client = this.waitingRoom.find((client) => client.id === id);
-    if (!client) return;
+    const client = this.waitingRoom.find(client => client.id === id);
+    if (!client || this.matchMakingQueue.find(client => client.id === id))
+      return;
 
     const user: User = {
       ...client,
       firstName,
       room: "waitingRoom",
       votes: 0,
-      hasVoted: false
-    }
+      hasVoted: false,
+    };
 
     this.matchMakingQueue.push(user);
 
-    if(this.matchMakingQueue.length >= 4){
-      const room = this.chatRoomManager.createRoom(this.matchMakingQueue.splice(0, 4));
-      const message = { from: "server", event: ServerEvent.ConnectionStatus, data: { message: `Game started in room ${room.getId()}`}} as ClientMessage;
-      room.getUsers().forEach((client) => {
-        client.ws.send(JSON.stringify(message));
+    if (this.matchMakingQueue.length >= this.ROOM_SIZE - 1) {
+      const room = this.chatRoomManager.createRoom(
+        this.matchMakingQueue.splice(0, this.ROOM_SIZE - 1)
+      );
+
+      const connectionStatusEvent = {
+        event: ServerEvent.ConnectionStatus,
+        data: { message: `Game started in room ${room.getId()}` },
+      };
+
+      room.getUsers().forEach(client => {
+        client.ws.send(JSON.stringify(connectionStatusEvent));
+        client.ws.send(
+          JSON.stringify({
+            event: ServerEvent.GameStatus,
+            data: {
+              players: room.getUsers().map(user => user.firstName),
+              started: true,
+              user: {
+                id: client.id,
+                firstName: client.firstName,
+              },
+            },
+          })
+        );
+        client.ws.send(
+          JSON.stringify({
+            data: {
+              message: {
+                id: randomUUID(),
+                author: {
+                  id: "server",
+                  firstName: "Server",
+                },
+                text: "Welcome to the game! Your goal is...",
+              },
+            },
+            event: ServerEvent.NewMessage,
+          })
+        );
       });
-    }
-    else{
-      const message = { from: "server", event: ServerEvent.ConnectionStatus, data: { message: `Missing players. Waiting for ${4 - this.matchMakingQueue.length} more players`}} as ClientMessage;
-      this.matchMakingQueue.forEach((client) =>{
+    } else {
+      const message = {
+        from: "server",
+        event: ServerEvent.ConnectionStatus,
+        data: {
+          message: `Missing players. Waiting for ${
+            this.ROOM_SIZE - this.matchMakingQueue.length - 1
+          } more players`,
+        },
+      };
+
+      this.matchMakingQueue.forEach(client => {
         client.ws.send(JSON.stringify(message));
       });
     }
   }
 
   public removeClient(id: string) {
-    this.chatRoomManager.removeUser(id);
+    const room = this.chatRoomManager.findChatroomFromUser(id);
+    const user = this.chatRoomManager.removeUser(id);
+
+    room?.getUsers().forEach(client => {
+      client.ws.send(
+        JSON.stringify({
+          from: "server",
+          event: Event.SendMessage,
+          data: { message: `${user?.firstName} disconnected from chat` },
+        } as ClientMessage)
+      );
+    });
+
+    this.matchMakingQueue = this.matchMakingQueue.filter(
+      client => client.id !== id
+    );
+    this.matchMakingQueue.forEach(client => {
+      client.ws.send(
+        JSON.stringify({
+          event: ServerEvent.ConnectionStatus,
+          data: {
+            message: `Missing players. Waiting for ${
+              4 - this.matchMakingQueue.length
+            } more players`,
+          },
+        })
+      );
+    });
   }
 
   public vote(id: string, votedClient: string) {
@@ -75,7 +167,7 @@ class WebSocketService {
   }
 
   public getClient(id: string) {
-    return this.waitingRoom.find((client) => client.id === id);
+    return this.waitingRoom.find(client => client.id === id);
   }
 }
 

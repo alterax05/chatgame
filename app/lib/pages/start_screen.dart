@@ -63,24 +63,21 @@ class _StartScreenState extends State<StartScreen> {
     );
   }
 
-  Widget _buildWaitingStatus() {
-    return BlocBuilder<GameBloc, GameState>(
-      builder: (context, state) {
-        return Column(
-          children: [
-            const Expanded(flex: 1, child: SizedBox()),
-            if (state.requiredPlayers != null)
-              Text(
-                "Waiting for other ${state.requiredPlayers! - state.roomPlayers.length} players to join...",
-              ),
-            const SizedBox(height: 24.0),
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
-            const Expanded(flex: 2, child: SizedBox()),
-          ],
-        );
-      },
+  Widget _buildWaitingStatus(String? message) {
+    return Column(
+      children: [
+        const Expanded(flex: 1, child: SizedBox()),
+        const Center(
+          child: CircularProgressIndicator(),
+        ),
+        const SizedBox(height: 24.0),
+        if (message != null)
+          Text(
+            message,
+            textAlign: TextAlign.center,
+          ),
+        const Expanded(flex: 2, child: SizedBox()),
+      ],
     );
   }
 
@@ -88,7 +85,7 @@ class _StartScreenState extends State<StartScreen> {
   Widget build(BuildContext context) {
     return BlocListener<GameBloc, GameState>(
       listener: (context, state) {
-        if (state.connected) {
+        if (state.gameStarted) {
           context.replace("/chat");
         }
       },
@@ -96,11 +93,11 @@ class _StartScreenState extends State<StartScreen> {
         appBar: AppBar(
           title: const Text("Chat Game"),
         ),
-        body: Builder(
-          builder: (ctx) {
+        body: BlocBuilder<GameBloc, GameState>(
+          builder: (context, state) {
             return Builder(builder: (ctx) {
               if (_isWaitingRoom) {
-                return _buildWaitingStatus();
+                return _buildWaitingStatus(state.connectionMessage);
               }
 
               return _buildNameSelection();

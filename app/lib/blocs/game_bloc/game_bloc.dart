@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:chatgame/blocs/game_bloc/game_events.dart';
 import 'package:chatgame/blocs/game_bloc/game_states.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
 
 class GameBloc extends Bloc<GameEvent, GameState> {
   GameBloc() : super(const GameState()) {
@@ -25,13 +29,18 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       Connect event, Emitter<GameState> emit) async {
     debugPrint("connecting to room");
 
-    final serverUrl = Uri.parse('ws://localhost:3000');
+    final serverUrl = Uri.parse(
+        Platform.isAndroid ? 'ws://10.0.2.2:3000' : 'ws://localhost:3000');
     final webSocket = WebSocketChannel.connect(serverUrl);
 
     await webSocket.ready;
 
     webSocket.stream.listen((eventData) {
-      final event = WebSocketEvent.fromJson(eventData);
+      debugPrint("received event: $eventData");
+      final decodedData = jsonDecode(eventData) as Map<String, dynamic>;
+      if (!decodedData.containsKey("event")) return;
+
+      final event = WebSocketEvent.fromJson(decodedData);
 
       // map received data to the corresponding bloc event
       if (event.type == EventType.connectStatusUpdate) {
@@ -44,6 +53,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         add(NewMessageUpdate.fromJson(event.data));
       }
     });
+
+    webSocket.sink.add(WebSocketEvent(EventType.connect, event).toJson());
 
     emit(state.copyWith(webSocket: webSocket));
   }
@@ -65,7 +76,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     debugPrint("sending message");
 
     final webSocket = state.webSocket!;
-    webSocket.sink.add(WebSocketEvent(EventType.sendMessage, event.toJson()));
+    webSocket.sink.add(WebSocketEvent(EventType.sendMessage, event).toJson());
 
     debugPrint("sent message");
   }
@@ -79,11 +90,20 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   FutureOr<void> _onConnectStatusUpdate(
       ConnectStatusUpdate event, Emitter<GameState> emit) {
     debugPrint("received connect status update");
+
+    emit(state.copyWith(
+      connectionMessage: event.message,
+    ));
   }
 
   FutureOr<void> _onGameStatusUpdate(
       GameStatusUpdate event, Emitter<GameState> emit) {
     debugPrint("received game status update");
+
+    emit(state.copyWith(
+      gameStarted: event.started,
+      user: event.user,
+    ));
   }
 
   FutureOr<void> _onTurnStatusUpdate(
@@ -94,5 +114,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   FutureOr<void> _onNewMessageUpdate(
       NewMessageUpdate event, Emitter<GameState> emit) {
     debugPrint("received new message update");
+
+    emit(state.copyWith(
+        messages: List.from(state.messages)..add(event.message)));
   }
 }

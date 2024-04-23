@@ -1,49 +1,55 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
 
 class GameState extends Equatable {
   final WebSocketChannel? webSocket;
-  final bool connected;
-  final chat.User? player;
+  final bool gameStarted;
+  final chat.User? user;
   final String? roomId;
   final List<chat.User> roomPlayers;
-  final int? requiredPlayers;
+  final String? connectionMessage;
+  final List<chat.TextMessage> messages;
 
   const GameState({
     this.webSocket,
-    this.connected = false,
-    this.player,
+    this.gameStarted = false,
+    this.user,
     this.roomId,
     this.roomPlayers = const [],
-    this.requiredPlayers,
+    this.connectionMessage,
+    this.messages = const [],
   });
 
   @override
   List<Object?> get props => [
         webSocket,
-        connected,
-        player,
+        gameStarted,
+        user,
         roomId,
         roomPlayers,
-        requiredPlayers,
+        connectionMessage,
+        messages,
       ];
 
   GameState copyWith({
     WebSocketChannel? webSocket,
-    bool? connected,
-    chat.User? player,
+    chat.User? user,
     String? roomId,
     List<chat.User>? roomPlayers,
-    int? requiredPlayers,
+    bool? gameStarted,
+    String? connectionMessage,
+    List<chat.TextMessage>? messages,
   }) {
     return GameState(
       webSocket: webSocket ?? this.webSocket,
-      connected: connected ?? this.connected,
-      player: player ?? this.player,
+      user: user ?? this.user,
       roomId: roomId ?? this.roomId,
       roomPlayers: roomPlayers ?? this.roomPlayers,
-      requiredPlayers: requiredPlayers ?? this.requiredPlayers,
+      gameStarted: gameStarted ?? this.gameStarted,
+      connectionMessage: connectionMessage ?? this.connectionMessage,
+      messages: messages ?? this.messages,
     );
   }
 }

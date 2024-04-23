@@ -9,10 +9,11 @@ enum EventType {
   disconnect("disconnect"),
   sendMessage("sendMessage"),
   vote("vote"),
-  connectStatusUpdate("connectStatusUpdate"),
-  gameStatusUpdate("gameStatusUpdate"),
-  turnStatusUpdate("turnStatusUpdate"),
-  newMessageUpdate("newMessageUpdate");
+  connectStatusUpdate("connectionStatus"),
+  gameStatusUpdate("gameStatus"),
+  turnStatusUpdate("turnStatus"),
+  newMessageUpdate("newMessage"),
+  unknown("unknown");
 
   final String value;
 
@@ -29,42 +30,43 @@ class WebSocketEvent {
 
   String toJson() {
     return jsonEncode({
-      'type': type,
-      'data': data,
+      'event': type.value,
+      'data': data.toJsonMap(),
     });
   }
 
   factory WebSocketEvent.fromJson(Map<String, dynamic> json) {
     return WebSocketEvent(
-      EventType.values.firstWhere((e) => e.value == json['type']),
+      EventType.values.firstWhere((e) => e.value == json['event'],
+          orElse: () => EventType.unknown),
       json['data'],
     );
   }
 }
 
 class Connect extends GameEvent {
-  final String playerName;
+  final String firstName;
 
-  Connect(this.playerName);
+  Connect(this.firstName);
 
-  String toJson() {
-    return jsonEncode({
-      'playerName': playerName,
-    });
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'firstName': firstName,
+    };
   }
 }
 
 class Disconnect extends GameEvent {}
 
 class SendMessage extends GameEvent {
-  final String message;
+  final String text;
 
-  SendMessage(this.message);
+  SendMessage(this.text);
 
-  String toJson() {
-    return jsonEncode({
-      'message': message,
-    });
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'text': text,
+    };
   }
 }
 
@@ -83,25 +85,33 @@ class Vote extends GameEvent {
 // events received from the server
 
 class ConnectStatusUpdate extends GameEvent {
-  ConnectStatusUpdate();
+  final String? message;
+
+  ConnectStatusUpdate(
+    this.message,
+  );
 
   factory ConnectStatusUpdate.fromJson(Map<String, dynamic> json) {
-    return ConnectStatusUpdate();
+    return ConnectStatusUpdate(
+      json['message'],
+    );
   }
 }
 
 class GameStatusUpdate extends GameEvent {
-  final String roomId;
-  final List<String> roomPlayers;
-  final int requiredPlayers;
+  final String? roomId;
+  final List<String>? players;
+  final bool? started;
+  final chat.User? user;
 
-  GameStatusUpdate(this.roomId, this.roomPlayers, this.requiredPlayers);
+  GameStatusUpdate(this.roomId, this.players, this.started, this.user);
 
   factory GameStatusUpdate.fromJson(Map<String, dynamic> json) {
     return GameStatusUpdate(
       json['roomId'],
-      List<String>.from(json['roomPlayers']),
-      json['requiredPlayers'],
+      List<String>.from(json['players']),
+      json['started'],
+      chat.User.fromJson(json['user']),
     );
   }
 }
@@ -117,11 +127,11 @@ class TurnStatusUpdate extends GameEvent {
 }
 
 class NewMessageUpdate extends GameEvent {
-  final chat.CustomMessage message;
+  final chat.TextMessage message;
 
   NewMessageUpdate(this.message);
 
   factory NewMessageUpdate.fromJson(Map<String, dynamic> json) {
-    return NewMessageUpdate(chat.CustomMessage.fromJson(json['message']));
+    return NewMessageUpdate(chat.TextMessage.fromJson(json['message']));
   }
 }

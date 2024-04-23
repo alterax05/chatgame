@@ -21,7 +21,8 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
 
-    _user = context.read<GameBloc>().state.player;
+    _user = context.read<GameBloc>().state.user;
+    _messages.addAll(context.read<GameBloc>().state.messages);
   }
 
   void _onSendPressed(chat.PartialText message) {
@@ -37,19 +38,38 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<GameBloc, GameState>(
+      listenWhen: (prev, curr) {
+        return prev.messages != curr.messages;
+      },
       listener: (context, state) {
-        // TODO: implement listener
+        // add missing messages to the chat
+        final messages = state.messages;
+        final missingMessages = messages.where((message) {
+          return !_messages.any((existingMessage) {
+            return existingMessage.id == message.id;
+          });
+        }).toList();
+
+        if (missingMessages.isNotEmpty) {
+          setState(() {
+            _messages.addAll(missingMessages);
+          });
+        }
       },
       child: Scaffold(
         appBar: AppBar(
           title: const Text("Chat Game"),
         ),
-        body: Chat(
-          messages: _messages,
-          onSendPressed: _onSendPressed,
-          user: _user!,
-          customMessageBuilder: _buildCustomMessage,
-        ),
+        body: Builder(builder: (context) {
+          return Chat(
+            showUserNames: true,
+            showUserAvatars: true,
+            messages: _messages.reversed.toList(),
+            onSendPressed: _onSendPressed,
+            user: _user!,
+            customMessageBuilder: _buildCustomMessage,
+          );
+        }),
       ),
     );
   }
