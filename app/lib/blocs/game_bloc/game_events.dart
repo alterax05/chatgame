@@ -103,15 +103,23 @@ class GameStatusUpdate extends GameEvent {
   final List<String>? players;
   final bool? started;
   final chat.User? user;
+  final int? turnNumber;
 
-  GameStatusUpdate(this.roomId, this.players, this.started, this.user);
+  GameStatusUpdate({
+    this.roomId,
+    this.players,
+    this.started,
+    this.user,
+    this.turnNumber,
+  });
 
   factory GameStatusUpdate.fromJson(Map<String, dynamic> json) {
     return GameStatusUpdate(
-      json['roomId'],
-      List<String>.from(json['players']),
-      json['started'],
-      chat.User.fromJson(json['user']),
+      roomId: json['roomId'],
+      players: List<String>.from(json['players']),
+      started: json['started'],
+      user: chat.User.fromJson(json['user']),
+      turnNumber: json['turnNumber'],
     );
   }
 }
