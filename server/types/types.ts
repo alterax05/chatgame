@@ -11,6 +11,7 @@ export interface User {
 export interface UserData {
   id: string;
   firstName: string;
+  roomId?: string;
 }
 
 export type AppEventData = typeof messageScheme._output;

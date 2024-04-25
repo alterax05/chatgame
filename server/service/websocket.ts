@@ -1,8 +1,8 @@
 import { WebSocket } from "ws";
-import { ChatRoomManager } from "./room";
+import { ChatRoom, ChatRoomManager } from "./room";
 import { Event, ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
-import { User, AppEventData } from "../types/types";
+import { User, AppEventData, UserData } from "../types/types";
 
 class WebSocketService {
   private usersList: User[];
@@ -17,14 +17,18 @@ class WebSocketService {
     this.chatRoomManager = new ChatRoomManager();
   }
 
-  public forwardMessage(message: AppEventData) {
-    if (!message.from || !message.data.text) return;
+  public forwardMessageToRoomPlayers(clientId: string, message: AppEventData) {
+    if (!message.data.text) return;
 
-    const user = this.usersList.find(client => client.id === message.from);
-    const room = this.chatRoomManager.findChatroomFromUser(message.from);
+    const user = this.usersList.find(client => client.id === clientId);
+    if (!user || !user.chatData?.roomId) return;
 
-    if (!room || !user) return;
-    const players = room.getUsers();
+    const room = this.chatRoomManager.findRoomById(user?.chatData?.roomId);
+    if (!room) return;
+
+    // TODO: do turn logic here
+
+    const players = room.getPlayers();
 
     players.forEach(player => {
       player.ws.send(
@@ -56,112 +60,130 @@ class WebSocketService {
     return newClient;
   }
 
-  public doMatchMaking(id: string, firstName: string) {
-    const client = this.usersList.find(client => client.id === id);
-    if (!client || this.matchMakingQueue.find(client => client.id === id))
+  public addPlayerInMatchMaking(clientId: string, firstName: string) {
+    const client = this.usersList.find(client => client.id === clientId);
+    if (!client || this.matchMakingQueue.find(client => client.id === clientId))
       return;
 
     const user: User = {
       ...client,
       chatData: {
-        id: client.id,
+        id: clientId,
         firstName,
       },
     };
-
-    this.matchMakingQueue.push(user); // add player in the matchmaking queue
+    // add player in the matchmaking queue
+    this.matchMakingQueue.push(user);
 
     if (this.matchMakingQueue.length >= this.ROOM_SIZE - 1) {
-      const users = this.matchMakingQueue.splice(0, this.ROOM_SIZE - 1);
-      this.createRoom(users);
+      this.startNewChatRoom();
     } else {
-      const message = {
-        from: "server",
-        event: ServerEvent.ConnectionStatus,
-        data: {
-          message: `Missing players. Waiting for ${
-            this.ROOM_SIZE - this.matchMakingQueue.length - 1
-          } more players`,
-        },
-      };
-
-      this.matchMakingQueue.forEach(client => {
-        client.ws.send(JSON.stringify(message));
-      });
+      this.sendMatchmakingStatusUpdate();
     }
   }
 
-  public createRoom(players: User[]) {
-    const room = this.chatRoomManager.createRoom(players);
-
-    const connectionStatusEvent = {
+  public sendMatchmakingStatusUpdate() {
+    const matchMakingStatus = {
+      from: "Server",
       event: ServerEvent.ConnectionStatus,
-      data: { message: `Game started in room ${room.getId()}` },
+      data: {
+        message: `Missing players. Waiting for ${
+          this.ROOM_SIZE - this.matchMakingQueue.length - 1
+        } more players`,
+      },
     };
 
-    room.getUsers().forEach(client => {
-      client.ws.send(JSON.stringify(connectionStatusEvent));
+    this.matchMakingQueue.forEach(client => {
+      client.ws.send(JSON.stringify(matchMakingStatus));
+    });
+  }
+
+  public startNewChatRoom() {
+    const players = this.matchMakingQueue.splice(0, this.ROOM_SIZE - 1);
+    const room = this.chatRoomManager.createRoom(players);
+
+    room.gameStatus.started = true;
+    room.gameStatus.turnNumber = 1;
+
+    this.sendGameStatusToRoomPlayers(room);
+
+    // greet players and tell them the rules of the game
+    setTimeout(() => this.greetPlayers(room), 1500);
+    // set first questioner
+    setTimeout(() => this.changeQuestioner(room), 3000);
+  }
+
+  public sendGameStatusToRoomPlayers(room: ChatRoom) {
+    const players = room.getPlayers();
+    const playersData = players.map(user => user.chatData);
+
+    players.forEach(client => {
       client.ws.send(
         JSON.stringify({
           event: ServerEvent.GameStatus,
           data: {
-            players: room.getUsers().map(user => user.chatData),
-            started: true,
+            players: playersData,
+            started: room.gameStatus.started,
             user: client.chatData,
-            turnNumber: room.turnNumber,
+            turnNumber: room.gameStatus.turnNumber,
           },
         })
       );
     });
-
-    setTimeout(() => {
-      room.getUsers().forEach(client => {
-        client.ws.send(
-          JSON.stringify({
-            data: {
-              message: {
-                id: randomUUID(),
-                author: {
-                  id: "server",
-                  firstName: "Server",
-                },
-                text: "Welcome to the game! Your goal is to find which player is a bot. Each turn a designated player will make a question. The other players will then answers in the more appropriate way.",
-              },
-            },
-            event: ServerEvent.NewMessage,
-          })
-        );
-      });
-    }, 1500);
-
-    setTimeout(() => {
-      const questioner = room.getQuestioner();
-
-      room.getUsers().forEach(client => {
-        client.ws.send(
-          JSON.stringify({
-            data: {
-              message: {
-                id: randomUUID(),
-                author: {
-                  id: "server",
-                  firstName: "Server",
-                },
-                text: `It's ${questioner.chatData?.firstName}'s turn to ask a question`,
-              },
-            },
-            event: ServerEvent.NewMessage,
-          })
-        );
-      });
-    }, 3000);
   }
 
-  public removeClient(id: string) {
-    const room = this.chatRoomManager.findChatroomFromUser(id);
-    const user = this.chatRoomManager.removeUser(id);
+  public greetPlayers(room: ChatRoom) {
+    room
+      .getPlayers()
+      .forEach(client =>
+        this.sendServerMessage(
+          client.ws,
+          "Welcome to the game! Your goal is to find which player is a bot. Each turn a designated player will make a question. The other players will then answers in the more appropriate way."
+        )
+      );
+  }
 
-    room?.getUsers().forEach(client => {
+  public changeQuestioner(room: ChatRoom) {
+    const questioner = room.setQuestioner();
+
+    this.sendTurnStatusToRoomPlayers(room);
+
+    // notify players of who is the questioner
+    room.getPlayers().forEach(client => {
+      this.sendServerMessage(
+        client.ws,
+        `It's ${questioner.chatData?.firstName}'s turn to ask a question`
+      );
+    });
+  }
+
+  public sendServerMessage(ws: WebSocket, message: string) {
+    ws.send(
+      JSON.stringify({
+        data: {
+          message: {
+            id: randomUUID(),
+            author: {
+              id: "Server",
+              firstName: "Server",
+            },
+            text: message,
+          },
+        },
+        event: ServerEvent.NewMessage,
+      })
+    );
+  }
+
+  public sendTurnStatusToRoomPlayers(room: ChatRoom) {
+    const players = room.getPlayers();
+  }
+
+  public disconnectClient(clientId: string) {
+    const user = this.usersList.find(client => client.id === clientId);
+    const room = this.chatRoomManager.findChatroomFromUser(clientId);
+
+    room?.getPlayers().forEach(client => {
       client.ws.send(
         JSON.stringify({
           event: ServerEvent.NewMessage,
@@ -169,7 +191,7 @@ class WebSocketService {
             message: {
               id: randomUUID(),
               author: {
-                id: "server",
+                id: "Server",
                 firstName: "Server",
               },
               text: `${user?.chatData?.firstName} disconnected from chat`,
@@ -180,26 +202,32 @@ class WebSocketService {
     });
 
     this.matchMakingQueue = this.matchMakingQueue.filter(
-      client => client.id !== id
+      client => client.id !== clientId
     );
+
+    const necessaryPlayers = Math.min(
+      this.ROOM_SIZE - this.matchMakingQueue.length,
+      0
+    );
+    const matchmakingStatus = {
+      event: ServerEvent.ConnectionStatus,
+      data: {
+        message: `Missing players. Waiting for ${necessaryPlayers} more players`,
+      },
+    };
     this.matchMakingQueue.forEach(client => {
-      client.ws.send(
-        JSON.stringify({
-          event: ServerEvent.ConnectionStatus,
-          data: {
-            message: `Missing players. Waiting for ${
-              4 - this.matchMakingQueue.length
-            } more players`,
-          },
-        })
-      );
+      client.ws.send(JSON.stringify(matchmakingStatus));
     });
   }
 
-  public vote(id: string, votedClientId: string) {
-    const room = this.chatRoomManager.findChatroomFromUser(id);
+  public votePlayerToEliminate(clientId: string, votedClientId: string) {
+    const user = this.usersList.find(client => client.id === clientId);
+    if (!user?.chatData?.roomId) return;
+
+    const room = this.chatRoomManager.findRoomById(user.chatData.roomId);
     if (!room) return;
-    room.vote(id, votedClientId);
+
+    room.vote(clientId, votedClientId);
   }
 
   public getClient(id: string) {

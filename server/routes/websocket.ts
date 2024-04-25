@@ -49,7 +49,7 @@ wsServer.on("connection", async (ws, request) => {
     client.ws.ping();
     if (client.failedPings > 3) {
       client.ws.terminate();
-      chatService.removeClient(client.id);
+      chatService.disconnectClient(client.id);
       console.log("Terminated connection with client: ", client.id);
       clearInterval(heartbeat);
     }
@@ -70,29 +70,29 @@ wsServer.on("connection", async (ws, request) => {
       const firstName = messageData.data.firstName;
       if (!firstName) return;
 
-      return chatService.doMatchMaking(id, firstName);
+      return chatService.addPlayerInMatchMaking(id, firstName);
     }
 
     if (messageData.event === Event.Disconnect) {
-      return chatService.removeClient(id);
+      return chatService.disconnectClient(id);
     }
 
     if (messageData.event === Event.SendMessage) {
-      return chatService.forwardMessage(messageData);
+      return chatService.forwardMessageToRoomPlayers(id, messageData);
     }
 
     if (messageData.event === Event.Vote) {
       const vote = messageData.data.vote;
       if (!vote) return;
 
-      return chatService.vote(id, vote);
+      return chatService.votePlayerToEliminate(id, vote);
     }
 
     return ws.send(JSON.stringify({ message: "Invalid message" }));
   });
 
   ws.on("close", () => {
-    chatService.removeClient(client.id);
+    chatService.disconnectClient(client.id);
     clearInterval(heartbeat);
   });
 

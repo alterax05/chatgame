@@ -1,17 +1,37 @@
 import { User } from "../types/types";
 import { fakerIT as faker } from "@faker-js/faker";
 
+interface TurnStatus {
+  questioner?: User;
+  wroteMessages: User[];
+}
+
+interface GameStatus {
+  started: boolean;
+  turnNumber: number;
+}
+
 class ChatRoom {
   public readonly id: string;
+
   private users: User[];
-  public turnNumber: number = 0;
+  private eliminatedUsers: User[] = [];
+  public turnStatus: TurnStatus;
+  public gameStatus: GameStatus;
 
   constructor(clients: User[]) {
     this.id = `${faker.word.adjective()}-${faker.word.noun()}-${
       Math.floor(Math.random() * 1000) + 1
     }`;
     this.users = clients;
-    this.users.forEach((user) => (user.room = this.id));
+
+    this.turnStatus = {
+      wroteMessages: [],
+    };
+    this.gameStatus = {
+      started: false,
+      turnNumber: 0,
+    };
   }
 
   removeUser(user: User) {
@@ -21,7 +41,7 @@ class ChatRoom {
     }
   }
 
-  getUsers() {
+  getPlayers() {
     return this.users;
   }
 
@@ -34,36 +54,37 @@ class ChatRoom {
   }
 
   vote(userId: string, votedClientId: string) {
-    const user = this.users.find((user) => user.id === userId);
+    const user = this.users.find(user => user.id === userId);
     if (!user) return;
 
-    const votedUser = this.users.find((user) => user.id === votedClientId);
+    const votedUser = this.users.find(user => user.id === votedClientId);
     if (!votedUser) return;
 
-    votedUser.votes++;
-    user.hasVoted = true;
+    // votedUser.votes++;
+    // user.hasVoted = true;
   }
 
   hasEveryoneVoted() {
-    return this.users.every((user) => user.hasVoted);
+    // return this.users.every(user => user.hasVoted);
   }
 
   resetVotes() {
-    this.users.forEach((user) => (user.votes = 0));
-    this.users.forEach((user) => (user.hasVoted = false));
+    // this.users.forEach(user => (user.votes = 0));
+    // this.users.forEach(user => (user.hasVoted = false));
   }
 
   // TODO: check behaviour if two users have the same vote count
   getMaxVotedUser() {
-    const max = Math.max(...this.users.map((user) => user.votes));
-    return this.users.find((user) => user.votes === max);
+    // const max = Math.max(...this.users.map(user => user.votes));
+    // return this.users.find(user => user.votes === max);
   }
 
-  public getQuestioner() {
+  public setQuestioner() {
     const randomIndex = Math.floor(Math.random() * this.users.length);
     return this.users[randomIndex];
   }
 }
+
 class ChatRoomManager {
   private rooms: ChatRoom[];
 
@@ -71,20 +92,29 @@ class ChatRoomManager {
     this.rooms = [];
   }
 
+  findRoomById(id: string) {
+    return this.rooms.find(room => room.getId() === id);
+  }
+
   createRoom(users: User[]) {
     const room = new ChatRoom(users);
     this.rooms.push(room);
+    users.forEach(user => {
+      user.chatData!.roomId = room.getId();
+    });
+
     return room;
   }
 
-  getRoomByName(name: string) {
-    return this.rooms.find((room) => room.getId() === name);
-  }
-
-  removeRoom(name: string) {
-    const index = this.rooms.findIndex((room) => room.getId() === name);
+  removeRoom(id: string) {
+    const index = this.rooms.findIndex(room => room.getId() === id);
     if (index !== -1) {
-      this.rooms.splice(index, 1);
+      const deletedRooms = this.rooms.splice(index, 1);
+      deletedRooms.forEach(room => {
+        room.getPlayers().forEach(player => {
+          player.chatData!.roomId = undefined;
+        });
+      });
     }
   }
 
@@ -92,34 +122,12 @@ class ChatRoomManager {
     return this.rooms;
   }
 
-  findUserInChatrooms(userId: string): User | undefined {
-    for (const room of this.getAllRooms()) {
-      const users = room.getUsers();
-      const foundUser = users.find((user) => user.id === userId);
-      if (foundUser) {
-        return foundUser;
-      }
-    }
-    return undefined;
-  }
-
-  findChatroomFromUser(userId: string): ChatRoom | undefined {
-    for (const room of this.getAllRooms()) {
-      const users = room.getUsers();
-      const foundUser = users.find((user) => user.id === userId);
-      if (foundUser) {
-        return room;
-      }
-    }
-    return undefined;
-  }
-
   removeUser(userId: string) {
     let user: User | undefined;
 
     for (const room of this.getAllRooms()) {
-      const users = room.getUsers();
-      const foundUser = users.find((user) => user.id === userId);
+      const users = room.getPlayers();
+      const foundUser = users.find(user => user.id === userId);
       console.log(foundUser);
       if (foundUser) {
         user = foundUser;

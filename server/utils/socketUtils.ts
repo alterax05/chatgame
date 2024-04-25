@@ -1,6 +1,6 @@
 import { RawData } from "ws";
-import { ClientMessage } from "../types/socket";
 import z from "zod";
+import { AppEventData } from "../types/types";
 
 export enum Event {
   Connect = "connect",
@@ -13,7 +13,6 @@ export enum ServerEvent {
   ConnectionStatus = "connectionStatus",
   GameStatus = "gameStatus",
   TurnStatus = "turnStatus",
-  VoteStatus = "voteStatus",
   NewMessage = "newMessage",
 }
 
@@ -33,7 +32,7 @@ class SocketUtils {
       const json = JSON.parse(message.toString());
       const messageData = messageScheme.parse(json);
       messageData.from = id;
-      return messageData as ClientMessage;
+      return messageData as AppEventData;
     } catch (e) {
       console.log(e);
       return null;
