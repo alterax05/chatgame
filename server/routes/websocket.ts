@@ -1,12 +1,12 @@
 import { WebSocketServer } from "ws";
 import UrlParser from "url";
 import SocketUtils, { Event } from "../utils/socketUtils";
-import WebSocketService from "../service/websocket";
+import GameService from "../service/gameService";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import ClientFilterUtils from "../utils/clientFilterUtils";
 
 const wsServer = new WebSocketServer({ noServer: true });
-const chatService = new WebSocketService();
+const chatService = new GameService();
 
 // limit each IP to X connections per hour
 const rateLimitingOptions = {
@@ -49,7 +49,7 @@ wsServer.on("connection", async (ws, request) => {
     client.ws.ping();
     if (client.failedPings > 3) {
       client.ws.terminate();
-      chatService.disconnectClient(client.id);
+      chatService.disconnectClient(client);
       console.log("Terminated connection with client: ", client.id);
       clearInterval(heartbeat);
     }
@@ -59,6 +59,12 @@ wsServer.on("connection", async (ws, request) => {
   // handle different type of messages
   ws.on("message", message => {
     const id = client.id;
+
+    const user = chatService.getUserById(id);
+    const room = user?.chatData?.roomId
+      ? chatService.findRoomById(user?.chatData?.roomId)
+      : undefined;
+
     const messageData = SocketUtils.parseMessage(message, id);
 
     if (!messageData) {
@@ -73,26 +79,34 @@ wsServer.on("connection", async (ws, request) => {
       return chatService.addPlayerInMatchMaking(id, firstName);
     }
 
+    // allow the following actions only for users inside a chat room
+    if (!user || !room)
+      return ws.send(
+        JSON.stringify({
+          message: "Invalid event. You must be inside a chat room",
+        })
+      );
+
     if (messageData.event === Event.Disconnect) {
-      return chatService.disconnectClient(id);
+      return chatService.disconnectClient(user);
     }
 
     if (messageData.event === Event.SendMessage) {
-      return chatService.forwardMessageToRoomPlayers(id, messageData);
+      return chatService.forwardMessageToRoomPlayers(user, room, messageData);
     }
 
     if (messageData.event === Event.Vote) {
       const vote = messageData.data.vote;
       if (!vote) return;
 
-      return chatService.votePlayerToEliminate(id, vote);
+      return chatService.votePlayerToEliminate(user, room, vote);
     }
 
-    return ws.send(JSON.stringify({ message: "Invalid message" }));
+    return ws.send(JSON.stringify({ message: "Invalid event" }));
   });
 
   ws.on("close", () => {
-    chatService.disconnectClient(client.id);
+    chatService.disconnectClient(client);
     clearInterval(heartbeat);
   });
 
