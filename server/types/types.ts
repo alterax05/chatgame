@@ -1,15 +1,23 @@
-import { Client } from "./socket";
+import { WebSocket } from "ws";
+import { messageScheme } from "../utils/socketUtils";
 
-export interface User extends Client {
-  firstName: string;
-  room: string;
-  votes: number;
-  hasVoted: boolean;
+export interface User {
+  ws: WebSocket;
+  failedPings: number;
+  id: string;
+  chatData?: UserData;
 }
+
+export interface UserData {
+  id: string;
+  firstName: string;
+}
+
+export type AppEventData = typeof messageScheme._output;
 
 export interface Message {
   id: string;
-  author: User;
+  author: UserData;
   text: string;
   metadata: any;
 }

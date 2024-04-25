@@ -1,33 +1,32 @@
 import { WebSocket } from "ws";
-import { Client, ClientMessage } from "../types/socket";
 import { ChatRoomManager } from "./room";
 import { Event, ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
-import { User } from "../types/types";
+import { User, AppEventData } from "../types/types";
 
 class WebSocketService {
-  private waitingRoom: Client[];
+  private usersList: User[];
   private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
 
   ROOM_SIZE = 3;
 
   constructor() {
-    this.waitingRoom = [];
+    this.usersList = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
   }
 
-  public forwardMessage(message: ClientMessage) {
-    if (!message.from) return;
+  public forwardMessage(message: AppEventData) {
+    if (!message.from || !message.data.text) return;
 
+    const user = this.usersList.find(client => client.id === message.from);
     const room = this.chatRoomManager.findChatroomFromUser(message.from);
-    const user = this.chatRoomManager.findUserInChatrooms(message.from);
 
     if (!room || !user) return;
     const players = room.getUsers();
 
-    players.forEach((player) => {
+    players.forEach(player => {
       player.ws.send(
         JSON.stringify({
           data: {
@@ -35,7 +34,7 @@ class WebSocketService {
               id: randomUUID(),
               author: {
                 id: user.id,
-                firstName: user.firstName,
+                firstName: user.chatData?.firstName,
               },
               text: message.data.text,
             },
@@ -46,31 +45,31 @@ class WebSocketService {
     });
   }
 
-  public createClient(ws: WebSocket) {
-    const newClient: Client = {
+  public registerClient(ws: WebSocket) {
+    const newClient: User = {
       id: randomUUID(),
       ws,
       failedPings: 0,
     };
+    this.usersList.push(newClient);
 
-    this.waitingRoom.push(newClient);
     return newClient;
   }
 
-  public matchClient(id: string, firstName: string) {
-    const client = this.waitingRoom.find((client) => client.id === id);
-    if (!client || this.matchMakingQueue.find((client) => client.id === id))
+  public doMatchMaking(id: string, firstName: string) {
+    const client = this.usersList.find(client => client.id === id);
+    if (!client || this.matchMakingQueue.find(client => client.id === id))
       return;
 
     const user: User = {
       ...client,
-      firstName,
-      room: "waitingRoom",
-      votes: 0,
-      hasVoted: false,
+      chatData: {
+        id: client.id,
+        firstName,
+      },
     };
 
-    this.matchMakingQueue.push(user);
+    this.matchMakingQueue.push(user); // add player in the matchmaking queue
 
     if (this.matchMakingQueue.length >= this.ROOM_SIZE - 1) {
       const users = this.matchMakingQueue.splice(0, this.ROOM_SIZE - 1);
@@ -86,7 +85,7 @@ class WebSocketService {
         },
       };
 
-      this.matchMakingQueue.forEach((client) => {
+      this.matchMakingQueue.forEach(client => {
         client.ws.send(JSON.stringify(message));
       });
     }
@@ -100,18 +99,15 @@ class WebSocketService {
       data: { message: `Game started in room ${room.getId()}` },
     };
 
-    room.getUsers().forEach((client) => {
+    room.getUsers().forEach(client => {
       client.ws.send(JSON.stringify(connectionStatusEvent));
       client.ws.send(
         JSON.stringify({
           event: ServerEvent.GameStatus,
           data: {
-            players: room.getUsers().map((user) => user.firstName),
+            players: room.getUsers().map(user => user.chatData),
             started: true,
-            user: {
-              id: client.id,
-              firstName: client.firstName,
-            },
+            user: client.chatData,
             turnNumber: room.turnNumber,
           },
         })
@@ -119,7 +115,7 @@ class WebSocketService {
     });
 
     setTimeout(() => {
-      room.getUsers().forEach((client) => {
+      room.getUsers().forEach(client => {
         client.ws.send(
           JSON.stringify({
             data: {
@@ -141,7 +137,7 @@ class WebSocketService {
     setTimeout(() => {
       const questioner = room.getQuestioner();
 
-      room.getUsers().forEach((client) => {
+      room.getUsers().forEach(client => {
         client.ws.send(
           JSON.stringify({
             data: {
@@ -151,7 +147,7 @@ class WebSocketService {
                   id: "server",
                   firstName: "Server",
                 },
-                text: `It's ${questioner.firstName}'s turn to ask a question`,
+                text: `It's ${questioner.chatData?.firstName}'s turn to ask a question`,
               },
             },
             event: ServerEvent.NewMessage,
@@ -165,7 +161,7 @@ class WebSocketService {
     const room = this.chatRoomManager.findChatroomFromUser(id);
     const user = this.chatRoomManager.removeUser(id);
 
-    room?.getUsers().forEach((client) => {
+    room?.getUsers().forEach(client => {
       client.ws.send(
         JSON.stringify({
           event: ServerEvent.NewMessage,
@@ -176,7 +172,7 @@ class WebSocketService {
                 id: "server",
                 firstName: "Server",
               },
-              text: `${user?.firstName} disconnected from chat`,
+              text: `${user?.chatData?.firstName} disconnected from chat`,
             },
           },
         })
@@ -184,9 +180,9 @@ class WebSocketService {
     });
 
     this.matchMakingQueue = this.matchMakingQueue.filter(
-      (client) => client.id !== id
+      client => client.id !== id
     );
-    this.matchMakingQueue.forEach((client) => {
+    this.matchMakingQueue.forEach(client => {
       client.ws.send(
         JSON.stringify({
           event: ServerEvent.ConnectionStatus,
@@ -200,14 +196,14 @@ class WebSocketService {
     });
   }
 
-  public vote(id: string, votedClient: string) {
+  public vote(id: string, votedClientId: string) {
     const room = this.chatRoomManager.findChatroomFromUser(id);
     if (!room) return;
-    room.vote(id, votedClient);
+    room.vote(id, votedClientId);
   }
 
   public getClient(id: string) {
-    return this.waitingRoom.find((client) => client.id === id);
+    return this.usersList.find(client => client.id === id);
   }
 }
 

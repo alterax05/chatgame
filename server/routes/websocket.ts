@@ -6,7 +6,7 @@ import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import ClientFilterUtils from "../utils/clientFilterUtils";
 
 const wsServer = new WebSocketServer({ noServer: true });
-const wsService = new WebSocketService();
+const chatService = new WebSocketService();
 
 // limit each IP to X connections per hour
 const rateLimitingOptions = {
@@ -41,7 +41,7 @@ wsServer.on("connection", async (ws, request) => {
   }
 
   // register client
-  const client = wsService.createClient(ws);
+  const client = chatService.registerClient(ws);
   console.log("new connection with id: ", client.id);
 
   // handle zombie connections (clients that don't close the connection properly)
@@ -49,7 +49,7 @@ wsServer.on("connection", async (ws, request) => {
     client.ws.ping();
     if (client.failedPings > 3) {
       client.ws.terminate();
-      wsService.removeClient(client.id);
+      chatService.removeClient(client.id);
       console.log("Terminated connection with client: ", client.id);
       clearInterval(heartbeat);
     }
@@ -70,29 +70,29 @@ wsServer.on("connection", async (ws, request) => {
       const firstName = messageData.data.firstName;
       if (!firstName) return;
 
-      return wsService.matchClient(id, firstName);
+      return chatService.doMatchMaking(id, firstName);
     }
 
     if (messageData.event === Event.Disconnect) {
-      return wsService.removeClient(id);
+      return chatService.removeClient(id);
     }
 
     if (messageData.event === Event.SendMessage) {
-      return wsService.forwardMessage(messageData);
+      return chatService.forwardMessage(messageData);
     }
 
     if (messageData.event === Event.Vote) {
       const vote = messageData.data.vote;
       if (!vote) return;
 
-      return wsService.vote(id, vote);
+      return chatService.vote(id, vote);
     }
 
     return ws.send(JSON.stringify({ message: "Invalid message" }));
   });
 
   ws.on("close", () => {
-    wsService.removeClient(client.id);
+    chatService.removeClient(client.id);
     clearInterval(heartbeat);
   });
 
