@@ -24,6 +24,14 @@ export interface ChatRoom {
 export interface TurnStatus {
   questioner?: User;
   wroteMessages: Message[];
+  votes: Vote[];
+  votingIsOpen: boolean;
+}
+
+export interface Vote {
+  user: User;
+  vote: number;
+  hasVoted: boolean;
 }
 
 export interface GameStatus {

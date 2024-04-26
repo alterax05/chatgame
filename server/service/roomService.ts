@@ -9,7 +9,7 @@ class RoomService {
   }
 
   findRoomById(id: string) {
-    return this.rooms.find(room => room.id === id);
+    return this.rooms.find((room) => room.id === id);
   }
 
   createRoom(users: User[]) {
@@ -20,6 +20,8 @@ class RoomService {
       players: users,
       turnStatus: {
         wroteMessages: [],
+        votes: [],
+        votingIsOpen: false,
       },
       gameStatus: {
         started: false,
@@ -29,7 +31,7 @@ class RoomService {
     };
 
     this.rooms.push(room);
-    users.forEach(user => {
+    users.forEach((user) => {
       user.chatData!.roomId = room.id;
     });
 
@@ -39,11 +41,11 @@ class RoomService {
   removeRoom(id: string) {
     let room: ChatRoom | undefined;
 
-    const index = this.rooms.findIndex(room => room.id === id);
+    const index = this.rooms.findIndex((room) => room.id === id);
     if (index !== -1) {
       const deletedRooms = this.rooms.splice(index, 1);
       room = deletedRooms[0];
-      room.players.forEach(player => {
+      room.players.forEach((player) => {
         player.chatData!.roomId = undefined;
       });
     }
@@ -59,10 +61,10 @@ class RoomService {
     let user: User | undefined;
 
     for (const room of this.getAllRooms()) {
-      const foundUser = room.players.find(user => user.id === userId);
+      const foundUser = room.players.find((user) => user.id === userId);
       if (foundUser) {
         user = foundUser;
-        room.players = room.players.filter(player => player.id !== userId);
+        room.players = room.players.filter((player) => player.id !== userId);
         if (room.players.length === 0) {
           this.removeRoom(room.id);
         }
