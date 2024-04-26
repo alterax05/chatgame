@@ -113,7 +113,7 @@ class GameService {
       event: ServerEvent.ConnectionStatus,
       data: {
         message: `Missing players. Waiting for ${
-          this.ROOM_SIZE - this.matchMakingQueue.length - 1
+          this.ROOM_SIZE - this.matchMakingQueue.length
         } more players`,
       },
     };
