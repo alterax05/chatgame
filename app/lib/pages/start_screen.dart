@@ -85,7 +85,7 @@ class _StartScreenState extends State<StartScreen> {
   Widget build(BuildContext context) {
     return BlocListener<GameBloc, GameState>(
       listener: (context, state) {
-        if (state.gameStarted) {
+        if (state.started) {
           context.replace("/chat");
         }
       },

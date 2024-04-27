@@ -1,3 +1,4 @@
+import 'package:bubble/bubble.dart';
 import 'package:chatgame/blocs/game_bloc/game_states.dart';
 import 'package:flutter/material.dart';
 import 'package:chatgame/blocs/game_bloc/game_bloc.dart';
@@ -16,6 +17,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messages = <chat.Message>[];
   chat.User? _user;
+  chat.User? _votedUser;
 
   @override
   void initState() {
@@ -30,17 +32,85 @@ class _ChatScreenState extends State<ChatScreen> {
     context.read<GameBloc>().add(SendMessage(message.text));
   }
 
-  Widget _buildCustomMessage(chat.CustomMessage message,
-      {required int messageWidth}) {
-    return Text("some");
+  Widget _buildCustomMessage(
+    Widget child, {
+    required chat.Message message,
+    required nextMessageInGroup,
+  }) {
+    bool? isVotingMessage = message.metadata?['voting'];
+
+    return Bubble(
+      color: _user?.id != message.author.id
+          ? const Color(0xfff5f5f7)
+          : Theme.of(context).colorScheme.primary,
+      margin: nextMessageInGroup
+          ? const BubbleEdges.symmetric(horizontal: 6)
+          : null,
+      padding: const BubbleEdges.symmetric(horizontal: 4, vertical: 4),
+      nip: nextMessageInGroup
+          ? BubbleNip.no
+          : _user?.id != message.author.id
+              ? BubbleNip.leftBottom
+              : BubbleNip.rightBottom,
+      shadowColor: Colors.black.withOpacity(0.1),
+      child: Builder(
+        builder: (ctx) {
+          if (isVotingMessage == true) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                child,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: BlocBuilder<GameBloc, GameState>(
+                    builder: (context, state) {
+                      return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ...state.players
+                                .where((player) =>
+                                    state.eliminatedPlayers.every(
+                                        (eliminated) =>
+                                            eliminated.id != player.id) &&
+                                    player.id != state.user?.id)
+                                .map(
+                                  (player) => ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _votedUser != null
+                                          ? _votedUser?.id == player.id
+                                              ? Theme.of(context)
+                                                  .primaryColorDark
+                                              : Theme.of(context).disabledColor
+                                          : null,
+                                    ),
+                                    onPressed: () {
+                                      if (_votedUser == null) {
+                                        setState(() => _votedUser = player);
+                                        context
+                                            .read<GameBloc>()
+                                            .add(Vote(player.id));
+                                      }
+                                    },
+                                    child: Text(player.firstName!),
+                                  ),
+                                )
+                          ]);
+                    },
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return child;
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<GameBloc, GameState>(
-      listenWhen: (prev, curr) {
-        return prev.messages != curr.messages;
-      },
       listener: (context, state) {
         // add missing messages to the chat
         final messages = state.messages;
@@ -53,6 +123,13 @@ class _ChatScreenState extends State<ChatScreen> {
         if (missingMessages.isNotEmpty) {
           setState(() {
             _messages.addAll(missingMessages);
+          });
+        }
+
+        // clear voting state
+        if (state.votingIsOpen != true) {
+          setState(() {
+            _votedUser = null;
           });
         }
       },
@@ -69,7 +146,7 @@ class _ChatScreenState extends State<ChatScreen> {
             messages: _messages.reversed.toList(),
             onSendPressed: _onSendPressed,
             user: _user!,
-            customMessageBuilder: _buildCustomMessage,
+            bubbleBuilder: _buildCustomMessage,
           );
         }),
       ),

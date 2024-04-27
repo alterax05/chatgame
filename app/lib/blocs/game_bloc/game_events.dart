@@ -71,14 +71,14 @@ class SendMessage extends GameEvent {
 }
 
 class Vote extends GameEvent {
-  final String playerId;
+  final String vote;
 
-  Vote(this.playerId);
+  Vote(this.vote);
 
-  String toJson() {
-    return jsonEncode({
-      'playerId': playerId,
-    });
+  Map<String, dynamic> toJsonMap() {
+    return {
+      'vote': vote,
+    };
   }
 }
 
@@ -100,7 +100,8 @@ class ConnectStatusUpdate extends GameEvent {
 
 class GameStatusUpdate extends GameEvent {
   final String? roomId;
-  final List<String>? players;
+  final List<chat.User>? players;
+  final List<chat.User>? eliminatedPlayers;
   final bool? started;
   final chat.User? user;
   final int? turnNumber;
@@ -111,12 +112,19 @@ class GameStatusUpdate extends GameEvent {
     this.started,
     this.user,
     this.turnNumber,
+    this.eliminatedPlayers,
   });
 
   factory GameStatusUpdate.fromJson(Map<String, dynamic> json) {
     return GameStatusUpdate(
       roomId: json['roomId'],
-      players: List<String>.from(json['players']),
+      players: List<Map<String, dynamic>>.from(json['players'])
+          .map((e) => chat.User.fromJson(e))
+          .toList(),
+      eliminatedPlayers:
+          List<Map<String, dynamic>>.from(json['eliminatedPlayers'])
+              .map((e) => chat.User.fromJson(e))
+              .toList(),
       started: json['started'],
       user: chat.User.fromJson(json['user']),
       turnNumber: json['turnNumber'],
@@ -125,12 +133,27 @@ class GameStatusUpdate extends GameEvent {
 }
 
 class TurnStatusUpdate extends GameEvent {
-  final String playerId;
+  final List<chat.Message> wroteMessages;
+  final List<String> votes;
+  final bool votingIsOpen;
+  final chat.User questioner;
 
-  TurnStatusUpdate(this.playerId);
+  TurnStatusUpdate({
+    required this.wroteMessages,
+    required this.votes,
+    required this.votingIsOpen,
+    required this.questioner,
+  });
 
   factory TurnStatusUpdate.fromJson(Map<String, dynamic> json) {
-    return TurnStatusUpdate(json['playerId']);
+    return TurnStatusUpdate(
+      wroteMessages: List<Map<String, dynamic>>.from(json['wroteMessages'])
+          .map((e) => chat.TextMessage.fromJson(e))
+          .toList(),
+      votes: List<String>.from(json['votes']),
+      votingIsOpen: json['votingIsOpen'],
+      questioner: chat.User.fromJson(json['questioner']),
+    );
   }
 }
 

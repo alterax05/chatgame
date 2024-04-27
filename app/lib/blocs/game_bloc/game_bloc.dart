@@ -84,6 +84,9 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   FutureOr<void> _onVote(Vote event, Emitter<GameState> emit) {
     debugPrint("voting");
 
+    final webSocket = state.webSocket!;
+    webSocket.sink.add(WebSocketEvent(EventType.vote, event).toJson());
+
     debugPrint("voted");
   }
 
@@ -101,14 +104,19 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     debugPrint("received game status update");
 
     emit(state.copyWith(
-      gameStarted: event.started,
+      started: event.started,
       user: event.user,
+      players: event.players,
+      eliminatedPlayers: event.eliminatedPlayers,
+      turnNumber: event.turnNumber,
     ));
   }
 
   FutureOr<void> _onTurnStatusUpdate(
       TurnStatusUpdate event, Emitter<GameState> emit) {
     debugPrint("received turn status update");
+
+    emit(state.copyWith(votingIsOpen: event.votingIsOpen));
   }
 
   FutureOr<void> _onNewMessageUpdate(
