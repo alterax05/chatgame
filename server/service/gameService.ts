@@ -56,7 +56,7 @@ class GameService {
         firstName: user.chatData!.firstName!,
       },
       text: message.data.text,
-    };
+    } as Message;
 
     room.turnStatus.wroteMessages.push(messageToSend);
 
@@ -175,7 +175,9 @@ class GameService {
             user: client.chatData,
             ...room.gameStatus,
           },
-        })
+        },
+        (key, value) => (key === "ws" ? undefined : value) // remove ws from the object when serializing
+      )
       );
     });
   }
