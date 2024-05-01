@@ -14,10 +14,12 @@ class GameState extends Equatable {
   final List<chat.TextMessage> messages;
   final int turnNumber;
   final bool? votingIsOpen;
+  final bool finished;
 
   const GameState({
     this.webSocket,
     this.started = false,
+    this.finished = false,
     this.user,
     this.roomId,
     this.players = const [],
@@ -32,6 +34,7 @@ class GameState extends Equatable {
   List<Object?> get props => [
         webSocket,
         started,
+        finished,
         user,
         roomId,
         players,
@@ -53,6 +56,7 @@ class GameState extends Equatable {
     List<chat.TextMessage>? messages,
     int? turnNumber,
     bool? votingIsOpen,
+    bool? finished,
   }) {
     return GameState(
       webSocket: webSocket ?? this.webSocket,
@@ -65,6 +69,7 @@ class GameState extends Equatable {
       messages: messages ?? this.messages,
       turnNumber: turnNumber ?? this.turnNumber,
       votingIsOpen: votingIsOpen ?? this.votingIsOpen,
+      finished: finished ?? this.finished,
     );
   }
 }
