@@ -32,7 +32,6 @@ class GameService {
     message: AppEventData
   ) {
     if (!message.data.text || room.turnStatus.votingIsOpen) return;
-    // TODO: handle turn logics here
 
     // allow only one message per turn for each player
     if (
@@ -168,16 +167,17 @@ class GameService {
 
     players.forEach((client) => {
       client.ws.send(
-        JSON.stringify({
-          event: ServerEvent.GameStatus,
-          data: {
-            players: playersData,
-            user: client.chatData,
-            ...room.gameStatus,
+        JSON.stringify(
+          {
+            event: ServerEvent.GameStatus,
+            data: {
+              players: playersData,
+              user: client.chatData,
+              ...room.gameStatus,
+            },
           },
-        },
-        (key, value) => (key === "ws" ? undefined : value) // remove ws from the object when serializing
-      )
+          (key, value) => (key === "ws" ? undefined : value) // remove ws from the object when serializing
+        )
       );
     });
   }
@@ -268,7 +268,7 @@ class GameService {
       (client) => client.id !== user.id
     );
 
-    const necessaryPlayers = Math.min(
+    const necessaryPlayers = Math.max(
       this.ROOM_SIZE - this.matchMakingQueue.length,
       0
     );
@@ -330,7 +330,12 @@ class GameService {
     room.gameStatus.turnNumber++;
     room.turnStatus.votes = [];
     room.turnStatus.wroteMessages = [];
-    this.changeQuestioner(room);
+    // check if in the room there is only one player (the game has ended)
+    if (room.players.length <= 1) {
+      room.gameStatus.finished = true;
+    } else {
+      this.changeQuestioner(room);
+    }
     this.sendTurnStatusToRoomPlayers(room);
     this.sendGameStatusToRoomPlayers(room);
   }

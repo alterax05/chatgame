@@ -27,6 +27,7 @@ class RoomService {
         started: false,
         turnNumber: 0,
         eliminatedPlayers: [],
+        finished: false,
       },
     };
 

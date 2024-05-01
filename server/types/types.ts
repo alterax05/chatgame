@@ -38,6 +38,7 @@ export interface GameStatus {
   started: boolean;
   turnNumber: number;
   eliminatedPlayers: User[];
+  finished: boolean;
 }
 
 export interface Message {
