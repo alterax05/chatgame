@@ -333,6 +333,11 @@ class GameService {
     // check if in the room there is only one player (the game has ended)
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
+      room.players.forEach((client) =>
+        this.sendServerMessage(client.ws, "The game has finished!", {
+          finished: true,
+        })
+      );
     } else {
       this.changeQuestioner(room);
     }

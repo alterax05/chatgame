@@ -88,6 +88,7 @@ wsServer.on("connection", async (ws, request) => {
       );
 
     if (messageData.event === Event.Disconnect) {
+      console.log("player disconnected with id: ", client.id);
       return chatService.disconnectClient(user);
     }
 
