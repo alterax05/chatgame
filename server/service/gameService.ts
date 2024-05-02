@@ -4,11 +4,13 @@ import { Event, ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
 import { User, AppEventData, UserData, Vote } from "../types/types";
 import { Message } from "../types/types";
+import { OpenAI } from "openai";
 
 class GameService {
   private usersList: User[];
   private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
+  private openAI;
 
   ROOM_SIZE = 3;
 
@@ -16,6 +18,10 @@ class GameService {
     this.usersList = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
+    this.openAI = new OpenAI({
+      organization: process.env.ORG_ID,
+      apiKey: process.env.PROJECT_ID
+    });
   }
 
   public getUserById(id: string) {
