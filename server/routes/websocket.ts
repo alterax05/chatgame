@@ -100,7 +100,7 @@ wsServer.on("connection", async (ws, request) => {
       const vote = messageData.data.vote;
       if (!vote) return;
 
-      return chatService.votePlayerToEliminate(user, room, vote);
+      return chatService.votePlayerToEliminate(user.id, room, vote);
     }
 
     return ws.send(JSON.stringify({ message: "Invalid event" }));
