@@ -117,6 +117,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ElevatedButton(
                         onPressed: () {
                           context.replace('/');
+                          context.read<GameBloc>().add(Disconnect());
                         },
                         child: const Text("Return to start"),
                       ),

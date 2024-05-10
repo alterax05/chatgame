@@ -5,7 +5,9 @@ import { randomUUID } from "crypto";
 import { User, AppEventData, UserData, Vote } from "../types/types";
 import { Message } from "../types/types";
 import { OpenAI } from "openai";
+import { config } from "dotenv";
 
+config();
 class GameService {
   private usersList: User[];
   private matchMakingQueue: User[];
@@ -19,8 +21,8 @@ class GameService {
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
     this.openAI = new OpenAI({
-      organization: process.env.ORG_ID,
-      apiKey: process.env.PROJECT_ID
+      apiKey: process.env.PROJECT_ID,
+      organization: process.env.ORG_ID
     });
   }
 
