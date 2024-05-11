@@ -6,6 +6,7 @@ import 'package:chatgame/blocs/game_bloc/game_events.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
+import 'package:go_router/go_router.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -39,6 +40,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }) {
     bool? isVotingMessage = message.metadata?['voting'];
     List<chat.User>? playersToVote = message.metadata?['playersToVote'];
+    bool? isFinished = message.metadata?['finished'];
 
     return Bubble(
       color: _user?.id != message.author.id
@@ -107,6 +109,29 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           }
 
+          if (isFinished == true) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                child,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          context.replace('/');
+                          context.read<GameBloc>().add(Disconnect());
+                        },
+                        child: const Text("Return to start"),
+                      ),
+                    ],
+                  ),
+                )
+              ],
+            );
+          }
           return child;
         },
       ),
@@ -129,6 +154,18 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _messages.addAll(missingMessages);
           });
+        }
+
+        // clear voting state
+        // if (state.votingIsOpen != true) {
+        //   setState(() {
+        //     _votedUser = null;
+        //   });
+        // }
+
+        if (state.finished) {
+          context.read<GameBloc>().add(Disconnect());
+          debugPrint("game finished, disconnecting from room");
         }
       },
       child: Scaffold(

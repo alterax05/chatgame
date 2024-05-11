@@ -19,6 +19,7 @@ export interface ChatRoom {
   players: User[];
   turnStatus: TurnStatus;
   gameStatus: GameStatus;
+  AIdata: AIData;
 }
 
 export interface TurnStatus {
@@ -28,8 +29,12 @@ export interface TurnStatus {
   votingIsOpen: boolean;
 }
 
+export interface AIData extends UserData {
+  hasAnswered: boolean;
+}
+
 export interface Vote {
-  user: User;
+  userID: string;
   vote: number;
   hasVoted: boolean;
 }
@@ -38,6 +43,7 @@ export interface GameStatus {
   started: boolean;
   turnNumber: number;
   eliminatedPlayers: User[];
+  finished: boolean;
 }
 
 export interface Message {

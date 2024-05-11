@@ -4,11 +4,17 @@ import { Event, ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
 import { User, AppEventData, UserData, Vote } from "../types/types";
 import { Message } from "../types/types";
+import { OpenAI } from "openai";
+import { config } from "dotenv";
+import { getRandomInt } from "../utils/utils";
+import { get } from "http";
 
+config();
 class GameService {
   private usersList: User[];
   private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
+  private openAI;
 
   ROOM_SIZE = 3;
 
@@ -16,6 +22,10 @@ class GameService {
     this.usersList = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
+    this.openAI = new OpenAI({
+      apiKey: process.env.PROJECT_ID,
+      organization: process.env.ORG_ID,
+    });
   }
 
   public getUserById(id: string) {
@@ -26,13 +36,42 @@ class GameService {
     return this.chatRoomManager.findRoomById(id);
   }
 
+  private getAIResponse(room: ChatRoom) {
+    room.AIdata.hasAnswered = true;
+    setTimeout(async () => {
+      this.sendMessageToPlayers(
+        room.AIdata.firstName,
+        room.AIdata.id,
+        room,
+        "I'm ready to answer"
+      );
+
+      //TODO: Get AI response from OpenAI (now there seems to have a type error)
+      /*const completion = await this.openAI.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant designed to output JSON.",
+          },
+          { role: "user", content: "Who won the world series in 2020?" },
+        ],
+        model: "gpt-3.5-turbo-0125",
+        response_format: { type: "json_object" },
+      }); */
+    }, getRandomInt(1000, 5000));
+  }
+
   public forwardMessageToRoomPlayers(
     user: User,
     room: ChatRoom,
     message: AppEventData
   ) {
-    if (!message.data.text || room.turnStatus.votingIsOpen) return;
-    // TODO: handle turn logics here
+    if (
+      !message.data.text ||
+      room.turnStatus.votingIsOpen ||
+      room.gameStatus.finished
+    )
+      return;
 
     // allow only one message per turn for each player
     if (
@@ -49,13 +88,56 @@ class GameService {
       return;
     }
 
+    if (
+      room.turnStatus.questioner?.id === user.id &&
+      !room.AIdata.hasAnswered
+    ) {
+      this.getAIResponse(room);
+    }
+
+    this.sendMessageToPlayers(
+      user.chatData!.firstName!,
+      user.id,
+      room,
+      message.data.text
+    );
+
+    // check if we can pass to the voting phase
+    if (room.turnStatus.wroteMessages.length === room.players.length + 1) {
+      room.players.forEach((player) => {
+        this.sendServerMessage(player.ws, "Voting phase is open!", {
+          voting: true,
+        });
+      });
+      room.turnStatus.votingIsOpen = true;
+      this.sendTurnStatusToRoomPlayers(room);
+      this.createVoteArray(room);
+      this.makeAIVote(room);
+    }
+  }
+
+  private makeAIVote(room: ChatRoom) {
+    setTimeout(() => {
+      this.votePlayerToEliminate(room.AIdata.id, room, room.players[0].id);
+      console.log(
+        `AI voted ${room.players[0].id} (${room.players[0].chatData?.firstName})`
+      );
+    }, getRandomInt(1000, 5000));
+  }
+
+  private sendMessageToPlayers(
+    name: string,
+    id: string,
+    room: ChatRoom,
+    message: string
+  ) {
     const messageToSend = {
       id: randomUUID(),
       author: {
-        id: user.id,
-        firstName: user.chatData!.firstName!,
+        id: id,
+        firstName: name,
       },
-      text: message.data.text,
+      text: message,
     } as Message;
 
     room.turnStatus.wroteMessages.push(messageToSend);
@@ -71,18 +153,6 @@ class GameService {
         })
       );
     });
-
-    // check if we can pass to the voting phase
-    if (room.turnStatus.wroteMessages.length === room.players.length) {
-      room.players.forEach((player) => {
-        this.sendServerMessage(player.ws, "Voting phase is open!", {
-          voting: true,
-        });
-      });
-      room.turnStatus.votingIsOpen = true;
-      this.sendTurnStatusToRoomPlayers(room);
-      this.createVoteArray(room);
-    }
   }
 
   public registerClient(ws: WebSocket) {
@@ -155,29 +225,37 @@ class GameService {
     room.turnStatus.votes = room.players.map(
       (player) =>
         ({
-          user: player,
+          userID: player.id,
           vote: 0,
           hasVoted: false,
         } as Vote)
     );
+
+    room.turnStatus.votes.push({
+      userID: room.AIdata.id,
+      vote: 0,
+      hasVoted: false,
+    } as Vote);
   }
 
   public sendGameStatusToRoomPlayers(room: ChatRoom) {
     const players = room.players;
     const playersData = players.map((user) => user.chatData);
+    playersData.push(room.AIdata);
 
     players.forEach((client) => {
       client.ws.send(
-        JSON.stringify({
-          event: ServerEvent.GameStatus,
-          data: {
-            players: playersData,
-            user: client.chatData,
-            ...room.gameStatus,
+        JSON.stringify(
+          {
+            event: ServerEvent.GameStatus,
+            data: {
+              players: playersData,
+              user: client.chatData,
+              ...room.gameStatus,
+            },
           },
-        },
-        (key, value) => (key === "ws" ? undefined : value) // remove ws from the object when serializing
-      )
+          (key, value) => (key === "ws" ? undefined : value) // remove ws from the object when serializing
+        )
       );
     });
   }
@@ -268,7 +346,7 @@ class GameService {
       (client) => client.id !== user.id
     );
 
-    const necessaryPlayers = Math.min(
+    const necessaryPlayers = Math.max(
       this.ROOM_SIZE - this.matchMakingQueue.length,
       0
     );
@@ -284,20 +362,20 @@ class GameService {
   }
 
   public votePlayerToEliminate(
-    user: User,
+    userID: string,
     room: ChatRoom,
     votedClientId: string
   ) {
-    if (!room.turnStatus.votingIsOpen) return;
+    if (!room.turnStatus.votingIsOpen || room.gameStatus.finished) return;
 
     const votingUser = room.turnStatus.votes.find(
-      (votingUser) => votingUser.user.id === user.id
+      (votingUser) => votingUser.userID === userID
     );
     if (!votingUser || votingUser.hasVoted) return;
     votingUser.hasVoted = true;
 
     const votedUser = room.turnStatus.votes.find(
-      (votedUser) => votedUser.user.id === votedClientId
+      (votedUser) => votedUser.userID === votedClientId
     );
     if (!votedUser) return;
     votedUser.vote++;
@@ -309,18 +387,32 @@ class GameService {
     // if all players have voted, close voting phase
     if (allVoted) {
       room.turnStatus.votingIsOpen = false;
-      const maxVotedPerson = room.turnStatus.votes.reduce((a, b) =>
+      const maxVotedPersonID = room.turnStatus.votes.reduce((a, b) =>
         a.vote > b.vote ? a : b
-      );
+      ).userID;
+
+      if (maxVotedPersonID === room.AIdata.id) {
+        room.gameStatus.finished = true;
+        room.players.forEach((client) =>
+          this.sendServerMessage(client.ws, "The game has finished!", {
+            finished: true,
+          })
+        );
+        return;
+      }
+
+      const maxVotedPerson = room.players.find(
+        (player) => player.id === maxVotedPersonID
+      )!;
       room.players.forEach((client) =>
         this.sendServerMessage(
           client.ws,
-          `${maxVotedPerson.user.chatData?.firstName} has been eliminated!`,
+          `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
           { voting: false }
         )
       );
-      room.gameStatus.eliminatedPlayers.push(maxVotedPerson.user);
-      const index = room.players.indexOf(maxVotedPerson.user);
+      room.gameStatus.eliminatedPlayers.push(maxVotedPerson);
+      const index = room.players.indexOf(maxVotedPerson);
       room.players.splice(index, 1);
       this.nextTurn(room);
     }
@@ -330,7 +422,18 @@ class GameService {
     room.gameStatus.turnNumber++;
     room.turnStatus.votes = [];
     room.turnStatus.wroteMessages = [];
-    this.changeQuestioner(room);
+    room.AIdata.hasAnswered = false;
+    // check if in the room there is only one player (the game has ended)
+    if (room.players.length <= 1) {
+      room.gameStatus.finished = true;
+      room.players.forEach((client) =>
+        this.sendServerMessage(client.ws, "The game has finished! You lose :(", {
+          finished: true,
+        })
+      );
+    } else {
+      this.changeQuestioner(room);
+    }
     this.sendTurnStatusToRoomPlayers(room);
     this.sendGameStatusToRoomPlayers(room);
   }

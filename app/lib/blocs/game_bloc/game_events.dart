@@ -105,6 +105,7 @@ class GameStatusUpdate extends GameEvent {
   final bool? started;
   final chat.User? user;
   final int? turnNumber;
+  final bool? finished;
 
   GameStatusUpdate({
     this.roomId,
@@ -113,6 +114,7 @@ class GameStatusUpdate extends GameEvent {
     this.user,
     this.turnNumber,
     this.eliminatedPlayers,
+    this.finished,
   });
 
   factory GameStatusUpdate.fromJson(Map<String, dynamic> json) {
@@ -128,6 +130,7 @@ class GameStatusUpdate extends GameEvent {
       started: json['started'],
       user: chat.User.fromJson(json['user']),
       turnNumber: json['turnNumber'],
+      finished: json['finished'],
     );
   }
 }

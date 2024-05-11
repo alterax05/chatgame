@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { ChatRoom, GameStatus, TurnStatus, User } from "../types/types";
 import { fakerIT as faker } from "@faker-js/faker";
 
@@ -13,11 +14,16 @@ class RoomService {
   }
 
   createRoom(users: User[]) {
+    const idRoom = randomUUID();
     const room: ChatRoom = {
-      id: `${faker.word.adjective()}-${faker.word.noun()}-${
-        Math.floor(Math.random() * 1000) + 1
-      }`,
+      id: idRoom,
       players: users,
+      AIdata: {
+        hasAnswered: false,
+        firstName: faker.person.firstName(),
+        id: randomUUID(),
+        roomId: idRoom,
+      },
       turnStatus: {
         wroteMessages: [],
         votes: [],
@@ -27,6 +33,7 @@ class RoomService {
         started: false,
         turnNumber: 0,
         eliminatedPlayers: [],
+        finished: false,
       },
     };
 
