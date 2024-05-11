@@ -394,9 +394,13 @@ class GameService {
       if (maxVotedPersonID === room.AIdata.id) {
         room.gameStatus.finished = true;
         room.players.forEach((client) =>
-          this.sendServerMessage(client.ws, "The game has finished!", {
-            finished: true,
-          })
+          this.sendServerMessage(
+            client.ws,
+            `The game has finished! ${room.AIdata.firstName} was the bot!`,
+            {
+              finished: true,
+            }
+          )
         );
         return;
       }
@@ -427,9 +431,13 @@ class GameService {
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
       room.players.forEach((client) =>
-        this.sendServerMessage(client.ws, "The game has finished! You lose :(", {
-          finished: true,
-        })
+        this.sendServerMessage(
+          client.ws,
+          "The game has finished! You lost :(",
+          {
+            finished: true,
+          }
+        )
       );
     } else {
       this.changeQuestioner(room);

@@ -71,34 +71,37 @@ class _ChatScreenState extends State<ChatScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             ...playersToVote!.map(
-                              (player) => ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _votedMessagesIds
-                                          .where((el) => el.$1 == message.id)
-                                          .isNotEmpty
-                                      ? _votedMessagesIds
-                                              .where((el) =>
-                                                  el.$1 == message.id &&
-                                                  el.$2.id == message.author.id)
-                                              .isNotEmpty
-                                          ? Theme.of(context).primaryColorDark
-                                          : Theme.of(context).disabledColor
-                                      : null,
+                              (player) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _votedMessagesIds
+                                            .where((el) => el.$1 == message.id)
+                                            .isNotEmpty
+                                        ? _votedMessagesIds
+                                                .where((el) =>
+                                                    el.$1 == message.id &&
+                                                    el.$2.id == player.id)
+                                                .isNotEmpty
+                                            ? Theme.of(context).primaryColorDark
+                                            : Theme.of(context).disabledColor
+                                        : null,
+                                  ),
+                                  onPressed: () {
+                                    if (_votedMessagesIds
+                                        .where((el) => el.$1 == message.id)
+                                        .isEmpty) {
+                                      setState(() {
+                                        _votedMessagesIds
+                                            .add((message.id, player));
+                                      });
+                                      context
+                                          .read<GameBloc>()
+                                          .add(Vote(player.id));
+                                    }
+                                  },
+                                  child: Text(player.firstName!),
                                 ),
-                                onPressed: () {
-                                  if (_votedMessagesIds
-                                      .where((el) => el.$1 == message.id)
-                                      .isEmpty) {
-                                    setState(() {
-                                      _votedMessagesIds
-                                          .add((message.id, player));
-                                    });
-                                    context
-                                        .read<GameBloc>()
-                                        .add(Vote(player.id));
-                                  }
-                                },
-                                child: Text(player.firstName!),
                               ),
                             )
                           ]);
