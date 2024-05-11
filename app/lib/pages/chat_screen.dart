@@ -17,7 +17,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messages = <chat.Message>[];
   chat.User? _user;
-  chat.User? _votedUser;
+  final _votedMessagesIds = <(String, chat.User)>[];
 
   @override
   void initState() {
@@ -38,6 +38,7 @@ class _ChatScreenState extends State<ChatScreen> {
     required nextMessageInGroup,
   }) {
     bool? isVotingMessage = message.metadata?['voting'];
+    List<chat.User>? playersToVote = message.metadata?['playersToVote'];
 
     return Bubble(
       color: _user?.id != message.author.id
@@ -67,33 +68,37 @@ class _ChatScreenState extends State<ChatScreen> {
                       return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            ...state.players
-                                .where((player) =>
-                                    state.eliminatedPlayers.every(
-                                        (eliminated) =>
-                                            eliminated.id != player.id) &&
-                                    player.id != state.user?.id)
-                                .map(
-                                  (player) => ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _votedUser != null
-                                          ? _votedUser?.id == player.id
-                                              ? Theme.of(context)
-                                                  .primaryColorDark
-                                              : Theme.of(context).disabledColor
-                                          : null,
-                                    ),
-                                    onPressed: () {
-                                      if (_votedUser == null) {
-                                        setState(() => _votedUser = player);
-                                        context
-                                            .read<GameBloc>()
-                                            .add(Vote(player.id));
-                                      }
-                                    },
-                                    child: Text(player.firstName!),
-                                  ),
-                                )
+                            ...playersToVote!.map(
+                              (player) => ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _votedMessagesIds
+                                          .where((el) => el.$1 == message.id)
+                                          .isNotEmpty
+                                      ? _votedMessagesIds
+                                              .where((el) =>
+                                                  el.$1 == message.id &&
+                                                  el.$2.id == message.author.id)
+                                              .isNotEmpty
+                                          ? Theme.of(context).primaryColorDark
+                                          : Theme.of(context).disabledColor
+                                      : null,
+                                ),
+                                onPressed: () {
+                                  if (_votedMessagesIds
+                                      .where((el) => el.$1 == message.id)
+                                      .isEmpty) {
+                                    setState(() {
+                                      _votedMessagesIds
+                                          .add((message.id, player));
+                                    });
+                                    context
+                                        .read<GameBloc>()
+                                        .add(Vote(player.id));
+                                  }
+                                },
+                                child: Text(player.firstName!),
+                              ),
+                            )
                           ]);
                     },
                   ),
@@ -123,13 +128,6 @@ class _ChatScreenState extends State<ChatScreen> {
         if (missingMessages.isNotEmpty) {
           setState(() {
             _messages.addAll(missingMessages);
-          });
-        }
-
-        // clear voting state
-        if (state.votingIsOpen != true) {
-          setState(() {
-            _votedUser = null;
           });
         }
       },

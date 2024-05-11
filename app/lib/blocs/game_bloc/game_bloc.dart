@@ -123,6 +123,17 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       NewMessageUpdate event, Emitter<GameState> emit) {
     debugPrint("received new message update");
 
+    bool? isVotingMessage = event.message.metadata?['voting'];
+
+    if (isVotingMessage == true) {
+      event.message.metadata?["playersToVote"] = state.players
+          .where((player) =>
+              state.eliminatedPlayers
+                  .every((eliminated) => eliminated.id != player.id) &&
+              player.id != state.user?.id)
+          .toList();
+    }
+
     emit(state.copyWith(
         messages: List.from(state.messages)..add(event.message)));
   }
