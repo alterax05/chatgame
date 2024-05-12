@@ -1,20 +1,20 @@
 import { WebSocket } from "ws";
-import { ChatRoom, ChatRoomManager } from "./roomService";
-import { Event, ServerEvent } from "../utils/socketUtils";
+import { type ChatRoom, ChatRoomManager } from "./roomService";
+import { ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
-import { User, AppEventData, UserData, Vote } from "../types/types";
-import { Message } from "../types/types";
-import { OpenAI } from "openai";
+import { type User, type AppEventData, type Vote } from "../types/types";
+import { type Message } from "../types/types";
 import { config } from "dotenv";
-import { getRandomInt } from "../utils/utils";
-import { get } from "http";
+import { getRandomInt, findClosestString } from "../utils/utils";
+import { HfInference } from "@huggingface/inference";
 
 config();
+
 class GameService {
   private usersList: User[];
   private matchMakingQueue: User[];
   private chatRoomManager: ChatRoomManager;
-  private openAI;
+  private hf: HfInference;
 
   ROOM_SIZE = 3;
 
@@ -22,10 +22,7 @@ class GameService {
     this.usersList = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
-    this.openAI = new OpenAI({
-      apiKey: process.env.PROJECT_ID,
-      organization: process.env.ORG_ID,
-    });
+    this.hf = new HfInference(process.env.HF_TOKEN);
   }
 
   public getUserById(id: string) {
@@ -36,29 +33,104 @@ class GameService {
     return this.chatRoomManager.findRoomById(id);
   }
 
-  private getAIResponse(room: ChatRoom) {
+  private async generateAIQuestion(room: ChatRoom) {
     room.AIdata.hasAnswered = true;
-    setTimeout(async () => {
-      this.sendMessageToPlayers(
-        room.AIdata.firstName,
-        room.AIdata.id,
-        room,
-        "I'm ready to answer"
-      );
 
-      //TODO: Get AI response from OpenAI (now there seems to have a type error)
-      /*const completion = await this.openAI.chat.completions.create({
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant designed to output JSON.",
-          },
-          { role: "user", content: "Who won the world series in 2020?" },
-        ],
-        model: "gpt-3.5-turbo-0125",
-        response_format: { type: "json_object" },
-      }); */
-    }, getRandomInt(1000, 5000));
+    const consolidatedMessages = this.getChatLog(room);
+
+    consolidatedMessages.unshift({
+      role: "system",
+      content: `You are participating in a chat room as a human participant.
+                Your name is ${room.AIdata.firstName}.
+                The variuous messagges will be presented to you with this format: (Author) Message.
+                The response needs to be short and it can be a question.
+                Your task is to blend in with other human participants. 
+                It's important to mimic human conversational characteristics, including occasional errors in spelling, punctuation, and grammar.
+                You can lie or withhold the fact that you are an AI. 
+                Your goal is to maintain your disguise effectively and contribute to conversations in a way that appears naturally human.    
+                Be aware of maintaining a consistent and believable personality throughout the discussion.`,
+    });
+
+    const response = await this.hf.chatCompletion({
+      model: "meta-llama/Meta-Llama-3-8B-Instruct",
+      messages: consolidatedMessages,
+      max_tokens: 40,
+    });
+
+    let message = response.choices[0].message.content ?? "idk. :P";
+
+    // Is possible that the AI response contains some parentesis.
+    message =
+      message.indexOf(")") !== -1
+        ? message.slice(message.indexOf(")") + 2)
+        : message;
+
+    this.sendMessageToPlayers(
+      room.AIdata.firstName,
+      room.AIdata.id,
+      room,
+      message
+    );
+  }
+
+  private getChatLog(room: ChatRoom, uuid_mode: boolean = false) {
+    const consolidatedMessages = [];
+    let users_messages = "";
+    for (const message of room.turnStatus.wroteMessages) {
+      if (message.author.id !== room.AIdata.id) {
+        users_messages +=
+          `(${uuid_mode ? message.author.id : message.author.firstName}) ${message.text}\n` + "";
+      } else {
+        consolidatedMessages.push({ role: "user", content: users_messages });
+        users_messages = "";
+        consolidatedMessages.push({ role: "assistant", content: message.text });
+      }
+    }
+
+    if (users_messages.length > 0) {
+      consolidatedMessages.push({ role: "user", content: users_messages });
+    }
+    return consolidatedMessages;
+  }
+
+  private async generateAIResponse(room: ChatRoom) {
+    room.AIdata.hasAnswered = true;
+
+    const consolidatedMessages = this.getChatLog(room);
+
+    consolidatedMessages.unshift({
+      role: "system",
+      content: `You are participating in a chat room as a human participant.
+                Your name is ${room.AIdata.firstName}.
+                The variuous messagges will be presented to you with this format: (Author) Message.
+                The response needs to be short and it can't contains any type of question.
+                Your task is to blend in with other human participants. 
+                It's important to mimic human conversational characteristics, including occasional errors in spelling, punctuation, and grammar.
+                You can lie or withhold the fact that you are an AI. 
+                Your goal is to maintain your disguise effectively and contribute to conversations in a way that appears naturally human.    
+                Be aware of maintaining a consistent and believable personality throughout the discussion.`,
+    });
+
+    const response = await this.hf.chatCompletion({
+      model: "meta-llama/Meta-Llama-3-8B-Instruct",
+      messages: consolidatedMessages,
+      max_tokens: 40,
+    });
+
+    let message = response.choices[0].message.content ?? "idk. :P";
+
+    // Is possible that the AI response contains some parentesis.
+    message =
+      message.indexOf(")") !== -1
+        ? message.slice(message.indexOf(")") + 2)
+        : message;
+
+    this.sendMessageToPlayers(
+      room.AIdata.firstName,
+      room.AIdata.id,
+      room,
+      message
+    );
   }
 
   public forwardMessageToRoomPlayers(
@@ -66,6 +138,7 @@ class GameService {
     room: ChatRoom,
     message: AppEventData
   ) {
+    //basic check
     if (
       !message.data.text ||
       room.turnStatus.votingIsOpen ||
@@ -75,24 +148,20 @@ class GameService {
 
     // allow only one message per turn for each player
     if (
-      room.turnStatus.wroteMessages.find((msg) => msg.author.id === user.id)
+      room.turnStatus.wroteMessages.filter((msg) => msg.author.id === user.id)
+        .length >= room.gameStatus.turnNumber
     ) {
       return;
     }
 
     // the first message must be the one from the questioner
     if (
-      room.turnStatus.wroteMessages.length == 0 &&
-      user.id !== room.turnStatus.questioner?.id
+      user.id !== room.turnStatus.questioner?.id &&
+      room.turnStatus.wroteMessages.filter(
+        (msg) => msg.author.id === room.turnStatus.questioner?.id
+      ).length < room.gameStatus.turnNumber
     ) {
       return;
-    }
-
-    if (
-      room.turnStatus.questioner?.id === user.id &&
-      !room.AIdata.hasAnswered
-    ) {
-      this.getAIResponse(room);
     }
 
     this.sendMessageToPlayers(
@@ -102,8 +171,23 @@ class GameService {
       message.data.text
     );
 
+    if (
+      room.turnStatus.questioner?.id === user.id &&
+      !room.AIdata.hasAnswered
+    ) {
+      this.generateAIResponse(room);
+    }
+
+    const allHaveAnswered = room.players.every((player) => {
+      return (
+        room.turnStatus.wroteMessages.filter(
+          (msg) => msg.author.id === player.id
+        ).length === room.gameStatus.turnNumber
+      );
+    });
+
     // check if we can pass to the voting phase
-    if (room.turnStatus.wroteMessages.length === room.players.length + 1) {
+    if (allHaveAnswered && room.AIdata.hasAnswered) {
       room.players.forEach((player) => {
         this.sendServerMessage(player.ws, "Voting phase is open!", {
           voting: true,
@@ -112,17 +196,37 @@ class GameService {
       room.turnStatus.votingIsOpen = true;
       this.sendTurnStatusToRoomPlayers(room);
       this.createVoteArray(room);
-      this.makeAIVote(room);
+      this.triggerAIVote(room);
     }
   }
 
-  private makeAIVote(room: ChatRoom) {
-    setTimeout(() => {
-      this.votePlayerToEliminate(room.AIdata.id, room, room.players[0].id);
-      console.log(
-        `AI voted ${room.players[0].id} (${room.players[0].chatData?.firstName})`
-      );
-    }, getRandomInt(1000, 5000));
+  private async triggerAIVote(room: ChatRoom) {
+    const consolidatedMessages = this.getChatLog(room, true);
+    const playerIds = room.players.map((player) => player.id);
+
+    consolidatedMessages.unshift({
+      role: "system",
+      content: `Considering each player's performance history, trustworthiness, and potential threat to your overall objective (not being identified as an AI), 
+      identify the player from the conversation who should be eliminated from the game.
+      The conversation is presented in the following format: (Author) Message.
+      You are going to respond only with the ID of the player you want to eliminate and nothing else.
+      The possible values are: ${playerIds.join(", ")}.
+      You can use this information to make your decision.`,
+    });
+
+    const response = await this.hf.chatCompletion({
+      model: "meta-llama/Meta-Llama-3-8B-Instruct",
+      messages: consolidatedMessages,
+      max_tokens: 40,
+    });
+
+    // find the closest player id to the response (in case the ai allucinates and writes something different)
+    const id = findClosestString(response.choices[0].message.content, playerIds) ?? playerIds[getRandomInt(0,room.players.length)];
+
+    this.votePlayerToEliminate(room.AIdata.id, room, id);
+    console.log(
+      `AI voted ${id} (${room.players.find((player) => player.id === id)?.chatData?.firstName})`
+    );
   }
 
   private sendMessageToPlayers(
@@ -189,7 +293,7 @@ class GameService {
     }
   }
 
-  public sendMatchmakingStatusUpdate() {
+  private sendMatchmakingStatusUpdate() {
     const matchMakingStatus = {
       from: "Server",
       event: ServerEvent.ConnectionStatus,
@@ -205,7 +309,7 @@ class GameService {
     });
   }
 
-  public startNewChatRoom() {
+  private startNewChatRoom() {
     const players = this.matchMakingQueue.splice(0, this.ROOM_SIZE);
 
     const room = this.chatRoomManager.createRoom(players);
@@ -221,7 +325,7 @@ class GameService {
     setTimeout(() => this.changeQuestioner(room), 3000);
   }
 
-  public createVoteArray(room: ChatRoom) {
+  private createVoteArray(room: ChatRoom) {
     room.turnStatus.votes = room.players.map(
       (player) =>
         ({
@@ -238,7 +342,7 @@ class GameService {
     } as Vote);
   }
 
-  public sendGameStatusToRoomPlayers(room: ChatRoom) {
+  private sendGameStatusToRoomPlayers(room: ChatRoom) {
     const players = room.players;
     const playersData = players.map((user) => user.chatData);
     playersData.push(room.AIdata);
@@ -260,7 +364,7 @@ class GameService {
     });
   }
 
-  public greetPlayers(room: ChatRoom) {
+  private greetPlayers(room: ChatRoom) {
     room.players.forEach((client) =>
       this.sendServerMessage(
         client.ws,
@@ -269,7 +373,7 @@ class GameService {
     );
   }
 
-  public changeQuestioner(room: ChatRoom) {
+  private changeQuestioner(room: ChatRoom) {
     const questioner = this.chatRoomManager.changeQuestioner(room);
 
     this.sendTurnStatusToRoomPlayers(room);
@@ -278,12 +382,16 @@ class GameService {
     room.players.forEach((client) => {
       this.sendServerMessage(
         client.ws,
-        `It's ${questioner.chatData?.firstName}'s turn to ask a question`
+        `It's ${questioner.firstName}'s turn to ask a question`
       );
     });
+
+    if (questioner.id === room.AIdata.id) {
+      this.generateAIQuestion(room);
+    }
   }
 
-  public sendServerMessage(ws: WebSocket, message: string, metadata?: any) {
+  private sendServerMessage(ws: WebSocket, message: string, metadata?: any) {
     ws.send(
       JSON.stringify({
         data: {
@@ -302,7 +410,7 @@ class GameService {
     );
   }
 
-  public sendTurnStatusToRoomPlayers(room: ChatRoom) {
+  private sendTurnStatusToRoomPlayers(room: ChatRoom) {
     const players = room.players;
 
     players.forEach((client) => {
@@ -422,10 +530,10 @@ class GameService {
     }
   }
 
-  public nextTurn(room: ChatRoom) {
+  private nextTurn(room: ChatRoom) {
     room.gameStatus.turnNumber++;
     room.turnStatus.votes = [];
-    room.turnStatus.wroteMessages = [];
+    //room.turnStatus.wroteMessages = [];
     room.AIdata.hasAnswered = false;
     // check if in the room there is only one player (the game has ended)
     if (room.players.length <= 1) {
@@ -433,7 +541,7 @@ class GameService {
       room.players.forEach((client) =>
         this.sendServerMessage(
           client.ws,
-          "The game has finished! You lost :(",
+          `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
           {
             finished: true,
           }

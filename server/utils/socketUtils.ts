@@ -1,6 +1,6 @@
-import { RawData } from "ws";
+import type { RawData } from "ws";
 import z from "zod";
-import { AppEventData } from "../types/types";
+import type { AppEventData } from "../types/types";
 
 export enum Event {
   Connect = "connect",

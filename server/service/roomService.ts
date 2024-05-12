@@ -1,5 +1,11 @@
 import { randomUUID } from "crypto";
-import { ChatRoom, GameStatus, TurnStatus, User } from "../types/types";
+import type {
+  ChatRoom,
+  GameStatus,
+  TurnStatus,
+  User,
+  UserData,
+} from "../types/types";
 import { fakerIT as faker } from "@faker-js/faker";
 
 class RoomService {
@@ -82,11 +88,22 @@ class RoomService {
   }
 
   changeQuestioner(room: ChatRoom) {
-    const questionerIndex = room.gameStatus.turnNumber % room.players.length;
-    room.turnStatus.questioner = room.players[questionerIndex];
+    const questionerIndex =
+      room.gameStatus.turnNumber % (room.players.length + 1);
+
+    if (questionerIndex === room.players.length) {
+      const aiData = {
+        firstName: room.AIdata.firstName,
+        id: room.AIdata.id,
+        roomId: room.AIdata.roomId,
+      };
+      room.turnStatus.questioner = aiData;
+    } else {
+      room.turnStatus.questioner = room.players[questionerIndex].chatData!;
+    }
 
     return room.turnStatus.questioner;
   }
 }
 
-export { ChatRoom, RoomService as ChatRoomManager };
+export { type ChatRoom, RoomService as ChatRoomManager };
