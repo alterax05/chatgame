@@ -4,11 +4,13 @@ import 'dart:io';
 
 import 'package:chatgame/blocs/game_bloc/game_events.dart';
 import 'package:chatgame/blocs/game_bloc/game_states.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
+import 'package:chatgame/config/config.dart';
 
 class GameBloc extends Bloc<GameEvent, GameState> {
   GameBloc() : super(const GameState()) {
@@ -29,8 +31,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       Connect event, Emitter<GameState> emit) async {
     debugPrint("connecting to room");
 
-    final serverUrl = Uri.parse(
-        Platform.isAndroid ? 'ws://10.0.2.2:3000' : 'ws://localhost:3000');
+    final serverUrl = Config.getServerURL();
     final webSocket = WebSocketChannel.connect(serverUrl);
 
     await webSocket.ready;
