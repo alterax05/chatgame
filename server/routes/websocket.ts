@@ -1,5 +1,4 @@
 import { WebSocketServer } from "ws";
-import UrlParser from "url";
 import SocketUtils, { Event } from "../utils/socketUtils";
 import GameService from "../service/gameService";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";

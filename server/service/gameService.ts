@@ -4,11 +4,9 @@ import { ServerEvent } from "../utils/socketUtils";
 import { randomUUID } from "crypto";
 import { type User, type AppEventData, type Vote } from "../types/types";
 import { type Message } from "../types/types";
-import { config } from "dotenv";
+import { HF_TOKEN } from "../utils/config";
 import { getRandomInt, findClosestString } from "../utils/utils";
 import { HfInference } from "@huggingface/inference";
-
-config();
 
 class GameService {
   private usersList: User[];
@@ -22,7 +20,7 @@ class GameService {
     this.usersList = [];
     this.matchMakingQueue = [];
     this.chatRoomManager = new ChatRoomManager();
-    this.hf = new HfInference(process.env.HF_TOKEN);
+    this.hf = new HfInference(HF_TOKEN);
   }
 
   public getUserById(id: string) {
@@ -42,7 +40,7 @@ class GameService {
       role: "system",
       content: `You are participating in a chat room as a human participant.
                 Your name is ${room.AIdata.firstName}.
-                The variuous messagges will be presented to you with this format: (Author) Message.
+                The variuous messagges will be presented to you with this format: (Author) [Message].
                 The response needs to be short and it can be a question.
                 Your task is to blend in with other human participants. 
                 It's important to mimic human conversational characteristics, including occasional errors in spelling, punctuation, and grammar.
@@ -78,8 +76,9 @@ class GameService {
     let users_messages = "";
     for (const message of room.turnStatus.wroteMessages) {
       if (message.author.id !== room.AIdata.id) {
-        users_messages +=
-          `(${uuid_mode ? message.author.id : message.author.firstName}) ${message.text}\n` + "";
+        users_messages += `(${
+          uuid_mode ? message.author.id : message.author.firstName
+        }) [${message.text}]\n`;
       } else {
         consolidatedMessages.push({ role: "user", content: users_messages });
         users_messages = "";
@@ -102,7 +101,7 @@ class GameService {
       role: "system",
       content: `You are participating in a chat room as a human participant.
                 Your name is ${room.AIdata.firstName}.
-                The variuous messagges will be presented to you with this format: (Author) Message.
+                The variuous messagges will be presented to you with this format: (Author) [Message].
                 The response needs to be short and it can't contains any type of question.
                 Your task is to blend in with other human participants. 
                 It's important to mimic human conversational characteristics, including occasional errors in spelling, punctuation, and grammar.
@@ -208,7 +207,7 @@ class GameService {
       role: "system",
       content: `Considering each player's performance history, trustworthiness, and potential threat to your overall objective (not being identified as an AI), 
       identify the player from the conversation who should be eliminated from the game.
-      The conversation is presented in the following format: (Author) Message.
+      The conversation is presented in the following format: (Author) [Message].
       You are going to respond only with the ID of the player you want to eliminate and nothing else.
       The possible values are: ${playerIds.join(", ")}.
       You can use this information to make your decision.`,
@@ -221,11 +220,15 @@ class GameService {
     });
 
     // find the closest player id to the response (in case the ai allucinates and writes something different)
-    const id = findClosestString(response.choices[0].message.content, playerIds) ?? playerIds[getRandomInt(0,room.players.length)];
+    const id =
+      findClosestString(response.choices[0].message.content, playerIds) ??
+      playerIds[getRandomInt(0, room.players.length)];
 
     this.votePlayerToEliminate(room.AIdata.id, room, id);
     console.log(
-      `AI voted ${id} (${room.players.find((player) => player.id === id)?.chatData?.firstName})`
+      `AI voted ${id} (${
+        room.players.find((player) => player.id === id)?.chatData?.firstName
+      })`
     );
   }
 
@@ -380,10 +383,14 @@ class GameService {
 
     // notify players of who is the questioner
     room.players.forEach((client) => {
-      this.sendServerMessage(
-        client.ws,
-        `It's ${questioner.firstName}'s turn to ask a question`
-      );
+      if (client.id === questioner.id) {
+        this.sendServerMessage(client.ws, "It's your turn to ask a question");
+      } else {
+        this.sendServerMessage(
+          client.ws,
+          `It's ${questioner.firstName}'s turn to ask a question. Please, wait for the question to be asked.`
+        );
+      }
     });
 
     if (questioner.id === room.AIdata.id) {
@@ -403,7 +410,7 @@ class GameService {
             },
             text: message,
             metadata,
-          } as Message,
+          },
         },
         event: ServerEvent.NewMessage,
       } as AppEventData)
@@ -504,7 +511,7 @@ class GameService {
         room.players.forEach((client) =>
           this.sendServerMessage(
             client.ws,
-            `The game has finished! ${room.AIdata.firstName} was the bot!`,
+            `The game has finished! 🎉 You won! 🎉 ${room.AIdata.firstName} was the bot!`,
             {
               finished: true,
             }
