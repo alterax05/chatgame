@@ -1,0 +1,1 @@
+ALTER TABLE `user_games` ADD PRIMARY KEY(`user_id`,`game_id`);

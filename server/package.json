@@ -5,7 +5,12 @@
   "scripts": {
     "build": "npx tsc",
     "start": "node dist/index.js",
-    "dev": "npx nodemon index.ts"
+    "dev": "npx nodemon index.ts",
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:migrate": "drizzle-kit migrate",
+    "drizzle:introspect": "drizzle-kit introspect",
+    "drizzle:up": "drizzle-kit up",
+    "drizzle:check": "drizzle-kit check"
   },
   "author": "",
   "license": "ISC",

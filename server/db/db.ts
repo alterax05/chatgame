@@ -1,13 +1,12 @@
 import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
-import { PASSWORD_DB, URI_DB, USER_DB} from "../utils/config.ts"
+import mysql from "mysql2";
+import { PASSWORD_DB, URI_DB, USER_DB} from "../utils/config"
 
-const connection = await mysql.createConnection({
+const connection = mysql.createConnection({
     host: URI_DB,
     user: USER_DB,
     password: PASSWORD_DB,
+    database: "chatgame",
 });
 
-const db = drizzle(connection);
-
-export { db };
+export const db = drizzle(connection);
