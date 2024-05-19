@@ -1,18 +1,18 @@
 CREATE TABLE `games` (
-	`id` int NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
 	`win` boolean NOT NULL,
 	CONSTRAINT `games_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
 CREATE TABLE `user_games` (
-	`user_id` int,
-	`game_id` int
+	`user_id` int NOT NULL,
+	`game_id` int NOT NULL,
+	CONSTRAINT `user_games_user_id_game_id_pk` PRIMARY KEY(`user_id`,`game_id`)
 );
 --> statement-breakpoint
 CREATE TABLE `users` (
-	`id` int NOT NULL,
+	`id` int AUTO_INCREMENT NOT NULL,
 	`username` varchar(256) NOT NULL,
-	`email` varchar(256) NOT NULL,
 	`password` varchar(256) NOT NULL,
 	CONSTRAINT `users_id` PRIMARY KEY(`id`)
 );

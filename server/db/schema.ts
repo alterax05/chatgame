@@ -3,18 +3,17 @@ import {
   mysqlTable,
   varchar,
   boolean,
-  primaryKey,
+  primaryKey as pk,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
-  id: int("id").primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
   username: varchar("username", { length: 256 }).notNull(),
-  email: varchar("email", { length: 256 }).notNull(),
   password: varchar("password", { length: 256 }).notNull(),
 });
 
 export const games = mysqlTable("games", {
-  id: int("id").primaryKey(),
+  id: int("id").autoincrement().primaryKey(),
   win: boolean("win").notNull(),
 });
 
@@ -26,7 +25,7 @@ export const userGames = mysqlTable(
   },
   (table) => {
     return {
-      pk: primaryKey({ columns: [table.userId, table.gameId] }),
+      pk: pk({ columns: [table.userId, table.gameId]}),
     };
   }
 );

@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "5",
-      "when": 1715972204258,
-      "tag": "0000_init_db",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1715972378348,
-      "tag": "0001_init_db2",
+      "when": 1716143185013,
+      "tag": "0000_acoustic_terror",
       "breakpoints": true
     }
   ]
