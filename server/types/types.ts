@@ -1,5 +1,6 @@
 import { WebSocket } from "ws";
 import { messageScheme } from "../utils/socketUtils";
+import { loginScheme } from "../utils/clientUtils";
 
 export interface User {
   ws: WebSocket;
@@ -54,3 +55,5 @@ export interface Message {
 }
 
 export type AppEventData = typeof messageScheme._output;
+
+export type LoginInfo = typeof loginScheme._output;

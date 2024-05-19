@@ -2,7 +2,7 @@ import { WebSocketServer } from "ws";
 import SocketUtils, { Event } from "../utils/socketUtils";
 import GameService from "../service/gameService";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
-import ClientFilterUtils from "../utils/clientFilterUtils";
+import ClientUtils from "../utils/clientUtils";
 
 const wsServer = new WebSocketServer({ noServer: true });
 const chatService = new GameService();
@@ -21,7 +21,7 @@ wsServer.on("connection", async (ws, request) => {
     return;
   }
 
-  const ip = ClientFilterUtils.getIpRequest(request);
+  const ip = ClientUtils.getIpRequest(request);
 
   if (!ip) {
     ws.send(JSON.stringify({ message: "IP not recognized" }));
