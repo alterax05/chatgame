@@ -2,7 +2,7 @@ import {
   int,
   mysqlTable,
   varchar,
-  boolean,
+  mysqlEnum,
   primaryKey as pk,
 } from "drizzle-orm/mysql-core";
 
@@ -14,7 +14,7 @@ export const users = mysqlTable("users", {
 
 export const games = mysqlTable("games", {
   id: int("id").autoincrement().primaryKey(),
-  win: boolean("win").notNull(),
+  status: mysqlEnum("status", ["unknown", "win", "lose"]),
 });
 
 export const userGames = mysqlTable(
@@ -25,7 +25,7 @@ export const userGames = mysqlTable(
   },
   (table) => {
     return {
-      pk: pk({ columns: [table.userId, table.gameId]}),
+      pk: pk({ columns: [table.userId, table.gameId] }),
     };
   }
 );

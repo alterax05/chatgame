@@ -14,7 +14,7 @@ router.get("/results", async (req, res) => {
   }
 
   const results = await db
-    .select({win: count(eq(games.win, true)), lose: count(eq(games.win, false))})
+    .select({win: count(eq(games.status, "win")), lose: count(eq(games.status, "lose"))})
     .from(games)
     .innerJoin(userGames, eq(userGames.gameId, games.id))
     .innerJoin(users, eq(users.id, userGames.userId))

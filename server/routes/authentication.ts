@@ -29,7 +29,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
   const { password: hashedPassword } = result[0];
 
-  if (bcrypt.compareSync(password, hashedPassword)) {
+  if (hashedPassword && bcrypt.compareSync(password, hashedPassword)) {
     const token = jwt.sign({ username }, JWT_SECRET ?? "super-secret", {
       expiresIn: JWT_EXPIRES_IN ?? "1h",
     });

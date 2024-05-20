@@ -9,7 +9,6 @@ const authenticateJWT = async (request: Request, response: Response, next: NextF
     let token = request.headers["authorization"] as string;
 
     if (!token) {
-        console.log("A token is required for authentication")
         return response.status(403).send({error: "A token is required for authentication"})
     }
 

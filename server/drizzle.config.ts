@@ -6,9 +6,9 @@ export default defineConfig({
   out: "./db/drizzle",
   dialect: "mysql",
   dbCredentials: {
-    host: "localhost",
-    user: "root",
-    //password: PASSWORD_DB!,
+    host: URI_DB!,
+    user: USER_DB!,
+    password: PASSWORD_DB!,
     port: 3306,
     database: "chatgame",
   },

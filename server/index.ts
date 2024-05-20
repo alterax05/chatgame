@@ -33,12 +33,6 @@ const server = app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
 });
 
-app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack); // log error stack to console
-  res.status(500).send('Something broke!');
-  next();
-});
-
 // forward web socket requests to wsServer
 server.on("upgrade", (request, socket, head) => {
   wsServer.handleUpgrade(request, socket, head, (socket) => {

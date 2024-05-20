@@ -15,12 +15,6 @@ const rateLimitingOptions = {
 const rateLimiter = new RateLimiterMemory(rateLimitingOptions);
 
 wsServer.on("connection", async (ws, request) => {
-  if (!request.url) {
-    ws.send(JSON.stringify({ message: "invalid url" }));
-    ws.close();
-    return;
-  }
-
   const ip = ClientUtils.getIpRequest(request);
 
   if (!ip) {
