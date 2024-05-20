@@ -2,6 +2,8 @@ import { IncomingMessage } from "http";
 import { Request } from "express";
 import { z } from "zod";
 import { LoginInfo } from "../types/types";
+import { verify, type JwtPayload } from "jsonwebtoken";
+import { JWT_SECRET } from "./config";
 
 class ClientUtils {
   static getIpRequest(req: IncomingMessage): string {
@@ -21,6 +23,15 @@ class ClientUtils {
       const loginInfo = loginScheme.parse(req.body);
       return loginInfo as LoginInfo;
     } catch (e) {
+      return null;
+    }
+  }
+
+  static getUsernameFromToken(token: string) {
+    try {
+      const decoded = verify(token, JWT_SECRET ?? "super-secret") as JwtPayload;
+      return decoded["username"];
+    } catch (err) {
       return null;
     }
   }

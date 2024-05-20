@@ -53,11 +53,11 @@ wsServer.on("connection", async (ws, request) => {
   ws.on("message", message => {
     const id = client.id;
 
-    const user = chatService.getUserById(id);
-    const room = user?.chatData?.roomId
-      ? chatService.findRoomById(user?.chatData?.roomId)
-      : undefined;
-
+    if(request.headers.authorization === undefined) {
+      ws.send(JSON.stringify({ message: "Missing token" }));
+      return;
+    }
+  
     const messageData = SocketUtils.parseMessage(message, id);
 
     if (!messageData) {
@@ -65,11 +65,15 @@ wsServer.on("connection", async (ws, request) => {
       return;
     }
 
-    if (messageData.event === Event.Connect) {
-      const firstName = messageData.data.firstName;
-      if (!firstName) return;
+    const username = ClientUtils.getUsernameFromToken(request.headers.authorization);
 
-      return chatService.addPlayerInMatchMaking(id, firstName);
+    const user = chatService.getUserById(id);
+    const room = user?.chatData?.roomId
+      ? chatService.findRoomById(user?.chatData?.roomId)
+      : undefined;
+
+    if (messageData.event === Event.Connect) {
+      return chatService.addPlayerInMatchMaking(id, username);
     }
 
     // allow the following actions only for users inside a chat room
@@ -90,7 +94,7 @@ wsServer.on("connection", async (ws, request) => {
     }
 
     if (messageData.event === Event.Vote) {
-      const vote = messageData.data.vote;
+      const vote = messageData.data?.vote;
       if (!vote) return;
 
       return chatService.votePlayerToEliminate(user.id, room, vote);

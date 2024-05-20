@@ -20,10 +20,9 @@ export const messageScheme = z.object({
   from: z.string().optional(),
   event: z.string(),
   data: z.object({
-    firstName: z.string().optional(),
     vote: z.string().optional(),
     text: z.string().optional(),
-  }),
+  }).optional(),
 });
 
 class SocketUtils {

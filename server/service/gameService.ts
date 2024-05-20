@@ -7,6 +7,9 @@ import { type Message } from "../types/types";
 import { HF_TOKEN } from "../utils/config";
 import { getRandomInt, findClosestString } from "../utils/utils";
 import { HfInference } from "@huggingface/inference";
+import { db } from "../db/db";
+import { games, userGames } from "../db/schema";
+import { eq } from "drizzle-orm";
 
 class GameService {
   private usersList: User[];
@@ -139,7 +142,7 @@ class GameService {
   ) {
     //basic check
     if (
-      !message.data.text ||
+      message.data?.text === undefined ||
       room.turnStatus.votingIsOpen ||
       room.gameStatus.finished
     )
@@ -286,6 +289,8 @@ class GameService {
       firstName,
     };
 
+    client.id = clientId;
+
     // add player in the matchmaking queue
     this.matchMakingQueue.push(client);
 
@@ -312,7 +317,7 @@ class GameService {
     });
   }
 
-  private startNewChatRoom() {
+  private async startNewChatRoom() {
     const players = this.matchMakingQueue.splice(0, this.ROOM_SIZE);
 
     const room = this.chatRoomManager.createRoom(players);
@@ -321,6 +326,14 @@ class GameService {
     room.gameStatus.turnNumber = 1;
 
     this.sendGameStatusToRoomPlayers(room);
+
+    const gameRecord = await db.insert(games).values({ status: "unknown" });
+
+    players.forEach(async (player) => {
+      await db.insert(userGames).values({gameId: gameRecord[0].insertId, userId: parseInt(player.id)});
+    });
+
+    room.id = gameRecord[0].insertId.toString();  
 
     // greet players and tell them the rules of the game
     setTimeout(() => this.greetPlayers(room), 1500);
@@ -476,7 +489,7 @@ class GameService {
     });
   }
 
-  public votePlayerToEliminate(
+  public async votePlayerToEliminate(
     userID: string,
     room: ChatRoom,
     votedClientId: string
@@ -517,6 +530,7 @@ class GameService {
             }
           )
         );
+        await db.update(games).set({status: "win"}).where(eq(games.id, parseInt(room.id)));
         return;
       }
 
@@ -537,7 +551,7 @@ class GameService {
     }
   }
 
-  private nextTurn(room: ChatRoom) {
+  private async nextTurn(room: ChatRoom) {
     room.gameStatus.turnNumber++;
     room.turnStatus.votes = [];
     //room.turnStatus.wroteMessages = [];
@@ -554,6 +568,7 @@ class GameService {
           }
         )
       );
+      await db.update(games).set({status: "lose"}).where(eq(games.id, parseInt(room.id)));
     } else {
       this.changeQuestioner(room);
     }
