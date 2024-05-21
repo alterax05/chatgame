@@ -176,6 +176,13 @@ class _ChatScreenState extends State<ChatScreen> {
           title: const Text("Chat Game"),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              context.read<GameBloc>().add(Disconnect());
+              context.go('/');
+            },
+          ),
         ),
         body: Builder(builder: (context) {
           return Chat(
