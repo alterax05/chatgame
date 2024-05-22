@@ -164,6 +164,8 @@ class GameService {
       return;
     }
 
+    if(room.gameStatus.eliminatedPlayers.find(player => player.id === user.id)) return;
+
     this.sendMessageToPlayers(
       user.chatData!.firstName!,
       user.id,
@@ -247,15 +249,17 @@ class GameService {
     room.turnStatus.wroteMessages.push(messageToSend);
 
     // forward message to all players in the room
-    room.players.forEach((player) => {
-      player.ws.send(
-        JSON.stringify({
-          data: {
-            message: messageToSend,
-          },
-          event: ServerEvent.NewMessage,
-        })
-      );
+    this.usersList.forEach((user) => {
+      if (user.chatData?.roomId === room.id) {
+        user.ws.send(
+          JSON.stringify({
+            data: {
+              message: messageToSend,
+            },
+            event: ServerEvent.NewMessage,
+          })
+        );
+      }
     });
   }
 
@@ -378,12 +382,14 @@ class GameService {
 
     this.sendTurnStatusToRoomPlayers(room);
 
-    // notify players of who is the questioner
-    room.players.forEach((client) => {
-      this.sendServerMessage(
-        client.ws,
-        `It's ${questioner.firstName}'s turn to ask a question`
-      );
+    // notify players of who is the questioner    
+    this.usersList.forEach((user) => {
+      if (user.chatData?.roomId === room.id) {
+        this.sendServerMessage(
+          user.ws,
+          `It's ${questioner.firstName}'s turn to ask a question`
+        );
+      }
     });
 
     if (questioner.id === room.AIdata.id) {
@@ -501,28 +507,32 @@ class GameService {
 
       if (maxVotedPersonID === room.AIdata.id) {
         room.gameStatus.finished = true;
-        room.players.forEach((client) =>
-          this.sendServerMessage(
-            client.ws,
-            `The game has finished! ${room.AIdata.firstName} was the bot!`,
-            {
-              finished: true,
-            }
-          )
-        );
+        this.usersList.forEach((user) => {
+          if(user.chatData?.roomId === room.id) {
+            this.sendServerMessage(
+              user.ws,
+              `The game has finished! You won! The AI player was ${room.AIdata.firstName}`,
+              {
+                finished: true,
+              }
+            );
+          }
+        });
         return;
       }
 
       const maxVotedPerson = room.players.find(
         (player) => player.id === maxVotedPersonID
       )!;
-      room.players.forEach((client) =>
-        this.sendServerMessage(
-          client.ws,
-          `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
-          { voting: false }
-        )
-      );
+      this.usersList.forEach((user) => {
+        if(user.chatData?.roomId === room.id) {
+          this.sendServerMessage(
+            user.ws,
+            `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
+            { voting: false }
+          );
+        }
+      });
       room.gameStatus.eliminatedPlayers.push(maxVotedPerson);
       const index = room.players.indexOf(maxVotedPerson);
       room.players.splice(index, 1);
@@ -538,15 +548,17 @@ class GameService {
     // check if in the room there is only one player (the game has ended)
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
-      room.players.forEach((client) =>
-        this.sendServerMessage(
-          client.ws,
-          `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
-          {
-            finished: true,
-          }
-        )
-      );
+      this.usersList.forEach((user) => {
+        if(user.chatData?.roomId === room.id) {
+          this.sendServerMessage(
+            user.ws,
+            `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
+            {
+              finished: true,
+            }
+          );
+        }
+      });
     } else {
       this.changeQuestioner(room);
     }
