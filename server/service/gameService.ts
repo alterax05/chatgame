@@ -51,19 +51,22 @@ class GameService {
                 Be aware of maintaining a consistent and believable personality throughout the discussion.`,
     });
 
-    const response = await this.hf.chatCompletion({
+    const message = await this.hf.chatCompletion({
       model: "meta-llama/Meta-Llama-3-8B-Instruct",
       messages: consolidatedMessages,
       max_tokens: 40,
+    }).then((response) => {
+      let message = response.choices[0].message.content ?? "idk. :P";
+      // Is possible that the AI response contains some parentesis.
+      message =
+        message.indexOf(")") !== -1
+          ? message.slice(message.indexOf(")") + 2)
+          : message;
+      return message;
+    }).catch((err) => {
+      console.log(err);
+      return "idk. :P";
     });
-
-    let message = response.choices[0].message.content ?? "idk. :P";
-
-    // Is possible that the AI response contains some parentesis.
-    message =
-      message.indexOf(")") !== -1
-        ? message.slice(message.indexOf(")") + 2)
-        : message;
 
     this.sendMessageToPlayers(
       room.AIdata.firstName,
@@ -79,7 +82,9 @@ class GameService {
     for (const message of room.turnStatus.wroteMessages) {
       if (message.author.id !== room.AIdata.id) {
         users_messages +=
-          `(${uuid_mode ? message.author.id : message.author.firstName}) ${message.text}\n` + "";
+          `(${uuid_mode ? message.author.id : message.author.firstName}) ${
+            message.text
+          }\n` + "";
       } else {
         consolidatedMessages.push({ role: "user", content: users_messages });
         users_messages = "";
@@ -111,19 +116,27 @@ class GameService {
                 Be aware of maintaining a consistent and believable personality throughout the discussion.`,
     });
 
-    const response = await this.hf.chatCompletion({
-      model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: consolidatedMessages,
-      max_tokens: 40,
-    });
+    const message = await this.hf
+      .chatCompletion({
+        model: "meta-llama/Meta-Llama-3-8B-Instruct",
+        messages: consolidatedMessages,
+        max_tokens: 40,
+      })
+      .then((response) => {
+        let message = response.choices[0].message.content ?? "idk. :P";
 
-    let message = response.choices[0].message.content ?? "idk. :P";
+        // Is possible that the AI response contains some parentesis.
+        message =
+          message.indexOf(")") !== -1
+            ? message.slice(message.indexOf(")") + 2)
+            : message;
 
-    // Is possible that the AI response contains some parentesis.
-    message =
-      message.indexOf(")") !== -1
-        ? message.slice(message.indexOf(")") + 2)
-        : message;
+        return message;
+      })
+      .catch((err) => {
+        console.log(err);
+        return "idk. :P";
+      });
 
     this.sendMessageToPlayers(
       room.AIdata.firstName,
@@ -164,7 +177,10 @@ class GameService {
       return;
     }
 
-    if(room.gameStatus.eliminatedPlayers.find(player => player.id === user.id)) return;
+    if (
+      room.gameStatus.eliminatedPlayers.find((player) => player.id === user.id)
+    )
+      return;
 
     this.sendMessageToPlayers(
       user.chatData!.firstName!,
@@ -216,18 +232,29 @@ class GameService {
       You can use this information to make your decision.`,
     });
 
-    const response = await this.hf.chatCompletion({
-      model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: consolidatedMessages,
-      max_tokens: 40,
-    });
-
-    // find the closest player id to the response (in case the ai allucinates and writes something different)
-    const id = findClosestString(response.choices[0].message.content, playerIds) ?? playerIds[getRandomInt(0,room.players.length)];
+    const id = await this.hf
+      .chatCompletion({
+        model: "meta-llama/Meta-Llama-3-8B-Instruct",
+        messages: consolidatedMessages,
+        max_tokens: 40,
+      })
+      .then((response) => {
+        return (
+          // find the closest player id to the response (in case the ai allucinates and writes something different)
+          findClosestString(response.choices[0].message.content, playerIds) ??
+          playerIds[getRandomInt(0, room.players.length)]
+        );
+      })
+      .catch((err) => {
+        console.log(err);
+        return playerIds[getRandomInt(0, room.players.length)];
+      });
 
     this.votePlayerToEliminate(room.AIdata.id, room, id);
     console.log(
-      `AI voted ${id} (${room.players.find((player) => player.id === id)?.chatData?.firstName})`
+      `AI voted ${id} (${
+        room.players.find((player) => player.id === id)?.chatData?.firstName
+      })`
     );
   }
 
@@ -382,7 +409,7 @@ class GameService {
 
     this.sendTurnStatusToRoomPlayers(room);
 
-    // notify players of who is the questioner    
+    // notify players of who is the questioner
     this.usersList.forEach((user) => {
       if (user.chatData?.roomId === room.id) {
         this.sendServerMessage(
@@ -508,7 +535,7 @@ class GameService {
       if (maxVotedPersonID === room.AIdata.id) {
         room.gameStatus.finished = true;
         this.usersList.forEach((user) => {
-          if(user.chatData?.roomId === room.id) {
+          if (user.chatData?.roomId === room.id) {
             this.sendServerMessage(
               user.ws,
               `The game has finished! You won! The AI player was ${room.AIdata.firstName}`,
@@ -525,7 +552,7 @@ class GameService {
         (player) => player.id === maxVotedPersonID
       )!;
       this.usersList.forEach((user) => {
-        if(user.chatData?.roomId === room.id) {
+        if (user.chatData?.roomId === room.id) {
           this.sendServerMessage(
             user.ws,
             `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
@@ -549,7 +576,7 @@ class GameService {
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
       this.usersList.forEach((user) => {
-        if(user.chatData?.roomId === room.id) {
+        if (user.chatData?.roomId === room.id) {
           this.sendServerMessage(
             user.ws,
             `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
