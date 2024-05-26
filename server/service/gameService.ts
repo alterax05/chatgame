@@ -41,7 +41,7 @@ class GameService {
 
     consolidatedMessages.unshift({
       role: "system",
-      content: `You are participating in a chat room as a human participant.
+      content: `You are participating in a chat room as a italian teenager participant.
                 Your name is ${room.AIdata.firstName}.
                 The variuous messagges will be presented to you with this format: (Author) [Message].
                 The response needs to be short and it can be a question.
@@ -52,19 +52,22 @@ class GameService {
                 Be aware of maintaining a consistent and believable personality throughout the discussion.`,
     });
 
-    const response = await this.hf.chatCompletion({
+    const message = await this.hf.chatCompletion({
       model: "meta-llama/Meta-Llama-3-8B-Instruct",
       messages: consolidatedMessages,
       max_tokens: 40,
+    }).then((response) => {
+      let message = response.choices[0].message.content ?? "idk. :P";
+      // Is possible that the AI response contains some parentesis.
+      message =
+        message.indexOf(")") !== -1
+          ? message.slice(message.indexOf(")") + 2)
+          : message;
+      return message;
+    }).catch((err) => {
+      console.log(err);
+      return "idk. :P";
     });
-
-    let message = response.choices[0].message.content ?? "idk. :P";
-
-    // Is possible that the AI response contains some parentesis.
-    message =
-      message.indexOf(")") !== -1
-        ? message.slice(message.indexOf(")") + 2)
-        : message;
 
     this.sendMessageToPlayers(
       room.AIdata.firstName,
@@ -102,7 +105,7 @@ class GameService {
 
     consolidatedMessages.unshift({
       role: "system",
-      content: `You are participating in a chat room as a human participant.
+      content: `You are participating in a chat room as a italian teenager participant.
                 Your name is ${room.AIdata.firstName}.
                 The variuous messagges will be presented to you with this format: (Author) [Message].
                 The response needs to be short and it can't contains any type of question.
@@ -113,19 +116,27 @@ class GameService {
                 Be aware of maintaining a consistent and believable personality throughout the discussion.`,
     });
 
-    const response = await this.hf.chatCompletion({
-      model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: consolidatedMessages,
-      max_tokens: 40,
-    });
+    const message = await this.hf
+      .chatCompletion({
+        model: "meta-llama/Meta-Llama-3-8B-Instruct",
+        messages: consolidatedMessages,
+        max_tokens: 40,
+      })
+      .then((response) => {
+        let message = response.choices[0].message.content ?? "idk. :P";
 
-    let message = response.choices[0].message.content ?? "idk. :P";
+        // Is possible that the AI response contains some parentesis.
+        message =
+          message.indexOf(")") !== -1
+            ? message.slice(message.indexOf(")") + 2)
+            : message;
 
-    // Is possible that the AI response contains some parentesis.
-    message =
-      message.indexOf(")") !== -1
-        ? message.slice(message.indexOf(")") + 2)
-        : message;
+        return message;
+      })
+      .catch((err) => {
+        console.log(err);
+        return "idk. :P";
+      });
 
     this.sendMessageToPlayers(
       room.AIdata.firstName,
@@ -165,6 +176,11 @@ class GameService {
     ) {
       return;
     }
+
+    if (
+      room.gameStatus.eliminatedPlayers.find((player) => player.id === user.id)
+    )
+      return;
 
     this.sendMessageToPlayers(
       user.chatData!.firstName!,
@@ -216,16 +232,23 @@ class GameService {
       You can use this information to make your decision.`,
     });
 
-    const response = await this.hf.chatCompletion({
-      model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: consolidatedMessages,
-      max_tokens: 40,
-    });
-
-    // find the closest player id to the response (in case the ai allucinates and writes something different)
-    const id =
-      findClosestString(response.choices[0].message.content, playerIds) ??
-      playerIds[getRandomInt(0, room.players.length)];
+    const id = await this.hf
+      .chatCompletion({
+        model: "meta-llama/Meta-Llama-3-8B-Instruct",
+        messages: consolidatedMessages,
+        max_tokens: 40,
+      })
+      .then((response) => {
+        return (
+          // find the closest player id to the response (in case the ai allucinates and writes something different)
+          findClosestString(response.choices[0].message.content, playerIds) ??
+          playerIds[getRandomInt(0, room.players.length)]
+        );
+      })
+      .catch((err) => {
+        console.log(err);
+        return playerIds[getRandomInt(0, room.players.length)];
+      });
 
     this.votePlayerToEliminate(room.AIdata.id, room, id);
     console.log(
@@ -253,15 +276,17 @@ class GameService {
     room.turnStatus.wroteMessages.push(messageToSend);
 
     // forward message to all players in the room
-    room.players.forEach((player) => {
-      player.ws.send(
-        JSON.stringify({
-          data: {
-            message: messageToSend,
-          },
-          event: ServerEvent.NewMessage,
-        })
-      );
+    this.usersList.forEach((user) => {
+      if (user.chatData?.roomId === room.id) {
+        user.ws.send(
+          JSON.stringify({
+            data: {
+              message: messageToSend,
+            },
+            event: ServerEvent.NewMessage,
+          })
+        );
+      }
     });
   }
 
@@ -395,16 +420,17 @@ class GameService {
     this.sendTurnStatusToRoomPlayers(room);
 
     // notify players of who is the questioner
-    room.players.forEach((client) => {
-      if (client.id === questioner.id) {
-        this.sendServerMessage(client.ws, "It's your turn to ask a question");
-      } else {
-        this.sendServerMessage(
-          client.ws,
-          `It's ${questioner.firstName}'s turn to ask a question. Please, wait for the question to be asked.`
-        );
-      }
-    });
+    this.usersList.forEach((client) => {
+      if (client.chatData?.roomId === room.id) {
+        if (client.id === questioner.id) {
+            this.sendServerMessage(client.ws, "It's your turn to ask a question");
+        } else {
+            this.sendServerMessage(
+                client.ws,
+                `It's ${questioner.firstName}'s turn to ask a question. Please, wait for the question to be asked.`
+            );
+        }
+    }});
 
     if (questioner.id === room.AIdata.id) {
       this.generateAIQuestion(room);
@@ -521,15 +547,17 @@ class GameService {
 
       if (maxVotedPersonID === room.AIdata.id) {
         room.gameStatus.finished = true;
-        room.players.forEach((client) =>
-          this.sendServerMessage(
-            client.ws,
+        this.usersList.forEach((user) => {
+          if (user.chatData?.roomId === room.id) {
+            this.sendServerMessage(
+              user.ws,
             `The game has finished! 🎉 You won! 🎉 ${room.AIdata.firstName} was the bot!`,
-            {
-              finished: true,
-            }
-          )
-        );
+              {
+                finished: true,
+              }
+            );
+          }
+        });
         await db.update(games).set({status: "win"}).where(eq(games.id, parseInt(room.id)));
         return;
       }
@@ -537,13 +565,15 @@ class GameService {
       const maxVotedPerson = room.players.find(
         (player) => player.id === maxVotedPersonID
       )!;
-      room.players.forEach((client) =>
-        this.sendServerMessage(
-          client.ws,
-          `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
-          { voting: false }
-        )
-      );
+      this.usersList.forEach((user) => {
+        if (user.chatData?.roomId === room.id) {
+          this.sendServerMessage(
+            user.ws,
+            `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
+            { voting: false }
+          );
+        }
+      });
       room.gameStatus.eliminatedPlayers.push(maxVotedPerson);
       const index = room.players.indexOf(maxVotedPerson);
       room.players.splice(index, 1);
@@ -559,15 +589,17 @@ class GameService {
     // check if in the room there is only one player (the game has ended)
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
-      room.players.forEach((client) =>
-        this.sendServerMessage(
-          client.ws,
-          `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
-          {
-            finished: true,
-          }
-        )
-      );
+      this.usersList.forEach((user) => {
+        if (user.chatData?.roomId === room.id) {
+          this.sendServerMessage(
+            user.ws,
+            `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
+            {
+              finished: true,
+            }
+          );
+        }
+      });
       await db.update(games).set({status: "lose"}).where(eq(games.id, parseInt(room.id)));
     } else {
       this.changeQuestioner(room);
