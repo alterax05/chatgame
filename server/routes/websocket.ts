@@ -3,6 +3,7 @@ import SocketUtils, { Event } from "../utils/socketUtils";
 import GameService from "../service/gameService";
 import { RateLimiterMemory, RateLimiterRes } from "rate-limiter-flexible";
 import ClientUtils from "../utils/clientUtils";
+import UrlParser from "url";
 
 const wsServer = new WebSocketServer({ noServer: true });
 const chatService = new GameService();
@@ -52,11 +53,14 @@ wsServer.on("connection", async (ws, request) => {
   // handle different type of messages
   ws.on("message", message => {
     const id = client.id;
-
-    if(request.headers.authorization === undefined) {
-      ws.send(JSON.stringify({ message: "Missing token" }));
+    
+    if (!request.url) {
+      ws.close();
       return;
     }
+
+    const { query } = UrlParser.parse(request.url, true);
+    const authorization = query.authorization as string;
   
     const messageData = SocketUtils.parseMessage(message, id);
 
@@ -65,8 +69,7 @@ wsServer.on("connection", async (ws, request) => {
       return;
     }
 
-    const username = ClientUtils.getUsernameFromToken(request.headers.authorization);
-
+    const username = ClientUtils.getUsernameFromToken(authorization);
     const user = chatService.getUserById(id);
     const room = user?.chatData?.roomId
       ? chatService.findRoomById(user?.chatData?.roomId)
