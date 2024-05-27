@@ -30,8 +30,8 @@ class MyApp extends StatelessWidget {
             ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(const Color(0xff6f61e8)),
-            foregroundColor: MaterialStateProperty.all(Colors.white),
+            backgroundColor: WidgetStateProperty.all(const Color(0xff6f61e8)),
+            foregroundColor: WidgetStateProperty.all(Colors.white),
           ),
         ),
       ),

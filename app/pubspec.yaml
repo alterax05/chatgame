@@ -38,7 +38,9 @@ dependencies:
   web_socket_channel: ^3.0.0
   bubble: ^1.2.1
   flutter_launcher_icons: ^0.13.1
-
+  flutter_chat_types: any
+  shared_preferences: ^2.2.3
+  http: ^1.2.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
