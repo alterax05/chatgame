@@ -52,22 +52,25 @@ class GameService {
                 Be aware of maintaining a consistent and believable personality throughout the discussion.`,
     });
 
-    const message = await this.hf.chatCompletion({
-      model: "meta-llama/Meta-Llama-3-8B-Instruct",
-      messages: consolidatedMessages,
-      max_tokens: 40,
-    }).then((response) => {
-      let message = response.choices[0].message.content ?? "idk. :P";
-      // Is possible that the AI response contains some parentesis.
-      message =
-        message.indexOf(")") !== -1
-          ? message.slice(message.indexOf(")") + 2)
-          : message;
-      return message;
-    }).catch((err) => {
-      console.log(err);
-      return "idk. :P";
-    });
+    const message = await this.hf
+      .chatCompletion({
+        model: "meta-llama/Meta-Llama-3-8B-Instruct",
+        messages: consolidatedMessages,
+        max_tokens: 40,
+      })
+      .then((response) => {
+        let message = response.choices[0].message.content ?? "idk. :P";
+        // Is possible that the AI response contains some parentesis.
+        message =
+          message.indexOf(")") !== -1
+            ? message.slice(message.indexOf(")") + 2)
+            : message;
+        return message;
+      })
+      .catch((err) => {
+        console.log(err);
+        return "idk. :P";
+      });
 
     this.sendMessageToPlayers(
       room.AIdata.firstName,
@@ -353,10 +356,15 @@ class GameService {
     const gameRecord = await db.insert(games).values({ status: "unknown" });
 
     players.forEach(async (player) => {
-      await db.insert(userGames).values({gameId: gameRecord[0].insertId, userId: parseInt(player.id)});
+      await db
+        .insert(userGames)
+        .values({
+          gameId: gameRecord[0].insertId,
+          userId: parseInt(player.id),
+        });
     });
 
-    room.id = gameRecord[0].insertId.toString();  
+    room.id = gameRecord[0].insertId.toString();
 
     // greet players and tell them the rules of the game
     setTimeout(() => this.greetPlayers(room), 1500);
@@ -419,10 +427,14 @@ class GameService {
 
     // notify players of who is the questioner
     room.players.forEach((client) => {
-      this.sendServerMessage(
-        client.ws,
-        `It's ${questioner.firstName}'s turn to ask a question`
-      );
+      if (client.id === questioner.id) {
+        this.sendServerMessage(client.ws, `It's your turn to ask a question.`);
+      } else {
+        this.sendServerMessage(
+          client.ws,
+          `It's ${questioner.firstName}'s turn to ask a question`
+        );
+      }
     });
 
     if (questioner.id === room.AIdata.id) {
@@ -549,7 +561,10 @@ class GameService {
             }
           )
         );
-        await db.update(games).set({status: "win"}).where(eq(games.id, parseInt(room.id)));
+        await db
+          .update(games)
+          .set({ status: "win" })
+          .where(eq(games.id, parseInt(room.id)));
         return;
       }
 
@@ -587,7 +602,10 @@ class GameService {
           }
         )
       );
-      await db.update(games).set({status: "lose"}).where(eq(games.id, parseInt(room.id)));
+      await db
+        .update(games)
+        .set({ status: "lose" })
+        .where(eq(games.id, parseInt(room.id)));
     } else {
       this.changeQuestioner(room);
     }
