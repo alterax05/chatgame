@@ -10,7 +10,8 @@
     "drizzle:migrate": "drizzle-kit migrate",
     "drizzle:introspect": "drizzle-kit introspect",
     "drizzle:up": "drizzle-kit up",
-    "drizzle:check": "drizzle-kit check"
+    "drizzle:check": "drizzle-kit check",
+    "drizzle:studio": "drizzle-kit studio"
   },
   "author": "",
   "license": "ISC",
