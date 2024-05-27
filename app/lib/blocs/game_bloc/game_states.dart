@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
 

@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
 import 'package:chatgame/blocs/game_bloc/game_events.dart';
 import 'package:chatgame/blocs/game_bloc/game_states.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'package:flutter_chat_types/flutter_chat_types.dart' as chat;
 import 'package:chatgame/config/config.dart';
 
 class GameBloc extends Bloc<GameEvent, GameState> {
@@ -31,7 +29,9 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       Connect event, Emitter<GameState> emit) async {
     debugPrint("connecting to room");
 
-    final serverUrl = Config.getServerURL();
+    final prefs = await SharedPreferences.getInstance();
+    final jwt = prefs.getString('jwt');
+    final serverUrl = Config.getServerURL(true).replace(queryParameters: {'authorization': jwt});
     final webSocket = WebSocketChannel.connect(serverUrl);
 
     await webSocket.ready;
@@ -55,7 +55,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       }
     });
 
-    webSocket.sink.add(WebSocketEvent(EventType.connect, event).toJson());
+    webSocket.sink.add(WebSocketEvent(EventType.connect, null).toJson());
 
     emit(state.copyWith(webSocket: webSocket));
   }

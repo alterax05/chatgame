@@ -29,10 +29,12 @@ class WebSocketEvent {
   WebSocketEvent(this.type, this.data);
 
   String toJson() {
-    return jsonEncode({
+    final message = {
       'event': type.value,
-      'data': data.toJsonMap(),
-    });
+      'data': data?.toJsonMap(),
+    };
+    message.removeWhere((key, value) => value == null);
+    return jsonEncode(message);
   }
 
   factory WebSocketEvent.fromJson(Map<String, dynamic> json) {
@@ -44,17 +46,7 @@ class WebSocketEvent {
   }
 }
 
-class Connect extends GameEvent {
-  final String firstName;
-
-  Connect(this.firstName);
-
-  Map<String, dynamic> toJsonMap() {
-    return {
-      'firstName': firstName,
-    };
-  }
-}
+class Connect extends GameEvent {}
 
 class Disconnect extends GameEvent {}
 

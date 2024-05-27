@@ -1,5 +1,10 @@
-import 'package:chatgame/pages/registration_screen.dart';
+import 'dart:convert';
+import 'package:chatgame/config/config.dart';
+import 'package:chatgame/utils/token_refresher.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,8 +15,38 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+
+  Future<void> _login() async {
+    if (_formKey.currentState!.validate()) {
+      // Perform login operation
+      final username = _usernameController.text;
+      final password = _passwordController.text;
+      final url = Config.getServerURL(false, path: '/login');
+      post(url, body: {
+        'username': username,
+        'password': password,
+      }).then((response) async {
+        if (response.statusCode == 200) {
+          final prefs = await SharedPreferences.getInstance();
+          Map <String, dynamic> tokenMap = jsonDecode(response.body);
+          prefs.setString('jwt', tokenMap['token']);
+          TokenRefresher().start();
+          if (!mounted) return;
+          context.go('/');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Invalid username or password'),
+          ));
+        }
+      }).catchError( (error) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('An error occurred'),
+        ));
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,16 +62,11 @@ class _LoginPageState extends State<LoginPage> {
             children: <Widget>[
               const SizedBox(height: 96.0),
               TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
+                controller: _usernameController,
+                decoration: const InputDecoration(labelText: 'Username'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
-                  }
-                  String pattern = r'^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$';
-                  RegExp regex = RegExp(pattern);
-                  if (!regex.hasMatch(value)) {
-                    return 'Enter a valid email';
+                    return 'Please enter your username';
                   }
                   return null;
                 },
@@ -54,17 +84,13 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 12.0),
               ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // Perform login operation
-                  }
-                },
+                onPressed: _login,
                 child: const Text('Login'),
               ),
               TextButton(
                 onPressed: () {
                   // Navigate to registration page
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => RegistrationPage()));
+                  context.push('/register');
                 },
                 child: const Text('Don\'t have an account? Register'),
               ),

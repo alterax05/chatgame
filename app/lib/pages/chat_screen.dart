@@ -23,7 +23,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-
     _user = context.read<GameBloc>().state.user;
     _messages.addAll(context.read<GameBloc>().state.messages);
   }
