@@ -14,7 +14,7 @@ const authenticateJWT = async (request: Request, response: Response, next: NextF
 
     try {
         token = token.split(" ")[1];
-        const decoded = verify(token, JWT_SECRET ?? "super-secret") as JwtPayload;
+        const decoded = verify(token, JWT_SECRET ?? "super-secret", { maxAge: "30m"}) as JwtPayload;
         request.body.username = decoded["username"];
 
     } catch (err) {

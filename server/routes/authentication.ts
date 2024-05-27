@@ -73,14 +73,23 @@ router.post("/register", async (req: Request, res: Response) => {
 });
 
 router.get("/refresh", async (req: Request, res: Response) => {
-  const oldToken = req.headers["authorization"] as string;
-  const decoded = jwt.verify(oldToken, JWT_SECRET ?? "super-secret") as JwtPayload;
-  const token = jwt.sign(
-    { username: decoded.username },
-    JWT_SECRET ?? "super-secret",
-    { expiresIn: JWT_EXPIRES_IN ?? "1h" }
-  );
-  res.json({ token });
+  try {
+    const oldToken = req.headers["authorization"] as string;
+    const decoded = jwt.verify(
+      oldToken,
+      JWT_SECRET ?? "super-secret",
+      { maxAge: JWT_EXPIRES_IN ?? "1h" }
+    ) as JwtPayload;
+    const token = jwt.sign(
+      { username: decoded.username },
+      JWT_SECRET ?? "super-secret",
+      { expiresIn: JWT_EXPIRES_IN ?? "1h" }
+    );
+    console.log("refreshed token");
+    res.json({ token });
+  } catch (e) {
+    res.status(401).json({ error: "Invalid token" });
+  }
 });
 
 export default router;
