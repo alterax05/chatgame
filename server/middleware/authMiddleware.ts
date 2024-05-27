@@ -1,7 +1,7 @@
 // Applying authentication to specific endpoints
 import { NextFunction, Request, Response } from 'express'
 import jsonwebtoken, { sign , verify, JwtPayload} from 'jsonwebtoken'
-import { JWT_SECRET } from '../utils/config'
+import { JWT_SECRET, JWT_EXPIRES_IN } from '../utils/config'
 
 // Protecting path
 const authenticateJWT = async (request: Request, response: Response, next: NextFunction) => {
@@ -14,7 +14,7 @@ const authenticateJWT = async (request: Request, response: Response, next: NextF
 
     try {
         token = token.split(" ")[1];
-        const decoded = verify(token, JWT_SECRET ?? "super-secret", { maxAge: "30m"}) as JwtPayload;
+        const decoded = verify(token, JWT_SECRET ?? "super-secret", { maxAge: JWT_EXPIRES_IN ?? "1h"}) as JwtPayload;
         request.body.username = decoded["username"];
 
     } catch (err) {

@@ -72,7 +72,7 @@ router.post("/register", async (req: Request, res: Response) => {
   res.json({ token });
 });
 
-router.get("/refresh", async (req: Request, res: Response) => {
+router.post("/refresh", async (req: Request, res: Response) => {
   try {
     const oldToken = req.headers["authorization"] as string;
     const decoded = jwt.verify(
