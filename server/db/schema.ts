@@ -8,13 +8,13 @@ import {
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  username: varchar("username", { length: 256 }).notNull(),
+  username: varchar("username", { length: 256 }).notNull().unique(),
   password: varchar("password", { length: 256 }).notNull(),
 });
 
 export const games = mysqlTable("games", {
   id: int("id").autoincrement().primaryKey(),
-  status: mysqlEnum("status", ["unknown", "win", "lose"]),
+  status: mysqlEnum("status", ["unknown", "win", "lost"]),
 });
 
 export const userGames = mysqlTable(

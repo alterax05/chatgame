@@ -15,6 +15,20 @@
       "when": 1716189391525,
       "tag": "0001_stormy_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1716822342092,
+      "tag": "0002_dazzling_stellaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1716835794217,
+      "tag": "0003_easy_firebrand",
+      "breakpoints": true
     }
   ]
 }
