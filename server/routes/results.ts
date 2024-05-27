@@ -1,6 +1,6 @@
 import express from "express";
 import { db } from "../db/db";
-import { count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { games, userGames, users } from "../db/schema";
 
 const router = express.Router();
@@ -13,15 +13,21 @@ router.get("/results", async (req, res) => {
     return;
   }
 
-  const results = await db
-    .select({win: count(eq(games.status, "win")), lost: count(eq(games.status, "lost"))})
+  const totalUserWins = await db
+    .select({ win: count(games.status) })
     .from(games)
     .innerJoin(userGames, eq(userGames.gameId, games.id))
     .innerJoin(users, eq(users.id, userGames.userId))
-    .where(eq(users.username, username));
+    .where(and(eq(users.username, username), eq(games.status, "win")));
 
-  res.json({...results[0], username});
+  const totalUserLosses = await db
+    .select({ lost: count(games.status) })
+    .from(games)
+    .innerJoin(userGames, eq(userGames.gameId, games.id))
+    .innerJoin(users, eq(users.id, userGames.userId))
+    .where(and(eq(users.username, username), eq(games.status, "lost")));
 
+  res.json({ win: totalUserWins[0].win, lost: totalUserLosses[0].lost, username });
 });
 
 export default router;

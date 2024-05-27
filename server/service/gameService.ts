@@ -369,14 +369,14 @@ class GameService {
   private async startNewChatRoom() {
     const players = this.matchMakingQueue.splice(0, this.ROOM_SIZE);
 
-    const room = this.chatRoomManager.createRoom(players);
+    const gameRecord = await db.insert(games).values({ status: "unknown" });
+
+    const room = this.chatRoomManager.createRoom(players, gameRecord[0].insertId);
 
     room.gameStatus.started = true;
     room.gameStatus.turnNumber = 1;
 
     this.sendGameStatusToRoomPlayers(room);
-
-    const gameRecord = await db.insert(games).values({ status: "unknown" });
 
     players.forEach(async (player) => {
       await db
@@ -386,8 +386,6 @@ class GameService {
           userId: parseInt(player.id),
         });
     });
-
-    room.id = gameRecord[0].insertId.toString();
 
     // greet players and tell them the rules of the game
     setTimeout(() => this.greetPlayers(room), 1500);

@@ -19,16 +19,15 @@ class RoomService {
     return this.rooms.find((room) => room.id === id);
   }
 
-  createRoom(users: User[]) {
-    const idRoom = randomUUID();
+  createRoom(users: User[], idRoom: number) {
     const room: ChatRoom = {
-      id: idRoom,
+      id: idRoom.toString(),
       players: users,
       AIdata: {
         hasAnswered: false,
         firstName: faker.person.firstName(),
         id: randomUUID(),
-        roomId: idRoom,
+        roomId: idRoom.toString(),
       },
       turnStatus: {
         wroteMessages: [],
