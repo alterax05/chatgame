@@ -8,7 +8,7 @@ import { HF_TOKEN } from "../utils/config";
 import { getRandomInt, findClosestString } from "../utils/utils";
 import { HfInference } from "@huggingface/inference";
 import { db } from "../db/db";
-import { games, userGames } from "../db/schema";
+import { games, userGames, users } from "../db/schema";
 import { eq } from "drizzle-orm";
 
 class GameService {
@@ -209,10 +209,15 @@ class GameService {
 
     // check if we can pass to the voting phase
     if (allHaveAnswered && room.AIdata.hasAnswered) {
+      //send for all players that the voting phase is open
       room.players.forEach((player) => {
         this.sendServerMessage(player.ws, "Voting phase is open!", {
           voting: true,
         });
+      });
+      //send for all eliminated players that the voting phase is open but they can't vote
+      room.gameStatus.eliminatedPlayers.forEach((player) => {
+        this.sendServerMessage(player.ws, "Voting phase is open!");
       });
       room.turnStatus.votingIsOpen = true;
       this.sendTurnStatusToRoomPlayers(room);
@@ -289,6 +294,18 @@ class GameService {
         })
       );
     });
+
+    // forward message to eliminated players
+    room.gameStatus.eliminatedPlayers.forEach((player) => {
+      player.ws.send(
+        JSON.stringify({
+          data: {
+            message: messageToSend,
+          },
+          event: ServerEvent.NewMessage,
+        })
+      );
+    });
   }
 
   public registerClient(ws: WebSocket) {
@@ -302,20 +319,26 @@ class GameService {
     return newClient;
   }
 
-  public addPlayerInMatchMaking(clientId: string, firstName: string) {
+  public async addPlayerInMatchMaking(clientId: string, firstName: string) {
     const client = this.usersList.find((client) => client.id === clientId);
     if (
       !client ||
       this.matchMakingQueue.find((client) => client.id === clientId)
     )
       return;
+    
+    const retrievedUserID = await db.select({id: users.id}).from(users).where(eq(users.username, firstName)).limit(1);
+    
+    if (retrievedUserID.length === 0) {
+      return;
+    }
 
     client.chatData = {
-      id: clientId,
+      id: retrievedUserID[0].id.toString(),
       firstName,
     };
 
-    client.id = clientId;
+    client.id = retrievedUserID[0].id.toString();
 
     // add player in the matchmaking queue
     this.matchMakingQueue.push(client);
@@ -435,6 +458,13 @@ class GameService {
           `It's ${questioner.firstName}'s turn to ask a question`
         );
       }
+    });
+
+    room.gameStatus.eliminatedPlayers.forEach((client) => {
+      this.sendServerMessage(
+        client.ws,
+        `It's ${questioner.firstName}'s turn to ask a question`
+      );
     });
 
     if (questioner.id === room.AIdata.id) {
@@ -561,6 +591,17 @@ class GameService {
             }
           )
         );
+
+        room.gameStatus.eliminatedPlayers.forEach((client) =>
+          this.sendServerMessage(
+            client.ws,
+            `The game has finished! ${room.AIdata.firstName} was the bot!`,
+            {
+              finished: true,
+            }
+          )
+        );
+
         await db
           .update(games)
           .set({ status: "win" })
@@ -571,6 +612,7 @@ class GameService {
       const maxVotedPerson = room.players.find(
         (player) => player.id === maxVotedPersonID
       )!;
+
       room.players.forEach((client) =>
         this.sendServerMessage(
           client.ws,
@@ -578,6 +620,14 @@ class GameService {
           { voting: false }
         )
       );
+
+      room.gameStatus.eliminatedPlayers.forEach((client) =>
+        this.sendServerMessage(
+          client.ws,
+          `${maxVotedPerson.chatData?.firstName} has been eliminated!`
+        )
+      );
+
       room.gameStatus.eliminatedPlayers.push(maxVotedPerson);
       const index = room.players.indexOf(maxVotedPerson);
       room.players.splice(index, 1);
@@ -602,9 +652,20 @@ class GameService {
           }
         )
       );
+
+      room.gameStatus.eliminatedPlayers.forEach((client) =>
+        this.sendServerMessage(
+          client.ws,
+          `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
+          {
+            finished: true,
+          }
+        )
+      );
+      
       await db
         .update(games)
-        .set({ status: "lose" })
+        .set({ status: "lost" })
         .where(eq(games.id, parseInt(room.id)));
     } else {
       this.changeQuestioner(room);

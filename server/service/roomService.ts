@@ -61,6 +61,10 @@ class RoomService {
       room.players.forEach((player) => {
         player.chatData!.roomId = undefined;
       });
+
+      room.gameStatus.eliminatedPlayers.forEach((player) => {
+        player.chatData!.roomId = undefined;
+      });
     }
 
     return room;
