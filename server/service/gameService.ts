@@ -276,17 +276,15 @@ class GameService {
     room.turnStatus.wroteMessages.push(messageToSend);
 
     // forward message to all players in the room
-    this.usersList.forEach((user) => {
-      if (user.chatData?.roomId === room.id) {
-        user.ws.send(
-          JSON.stringify({
-            data: {
-              message: messageToSend,
-            },
-            event: ServerEvent.NewMessage,
-          })
-        );
-      }
+    room.players.forEach((player) => {
+      player.ws.send(
+        JSON.stringify({
+          data: {
+            message: messageToSend,
+          },
+          event: ServerEvent.NewMessage,
+        })
+      );
     });
   }
 
@@ -420,17 +418,12 @@ class GameService {
     this.sendTurnStatusToRoomPlayers(room);
 
     // notify players of who is the questioner
-    this.usersList.forEach((client) => {
-      if (client.chatData?.roomId === room.id) {
-        if (client.id === questioner.id) {
-            this.sendServerMessage(client.ws, "It's your turn to ask a question");
-        } else {
-            this.sendServerMessage(
-                client.ws,
-                `It's ${questioner.firstName}'s turn to ask a question. Please, wait for the question to be asked.`
-            );
-        }
-    }});
+    room.players.forEach((client) => {
+      this.sendServerMessage(
+        client.ws,
+        `It's ${questioner.firstName}'s turn to ask a question`
+      );
+    });
 
     if (questioner.id === room.AIdata.id) {
       this.generateAIQuestion(room);
@@ -547,17 +540,15 @@ class GameService {
 
       if (maxVotedPersonID === room.AIdata.id) {
         room.gameStatus.finished = true;
-        this.usersList.forEach((user) => {
-          if (user.chatData?.roomId === room.id) {
-            this.sendServerMessage(
-              user.ws,
-            `The game has finished! 🎉 You won! 🎉 ${room.AIdata.firstName} was the bot!`,
-              {
-                finished: true,
-              }
-            );
-          }
-        });
+        room.players.forEach((client) =>
+          this.sendServerMessage(
+            client.ws,
+            `The game has finished! ${room.AIdata.firstName} was the bot!`,
+            {
+              finished: true,
+            }
+          )
+        );
         await db.update(games).set({status: "win"}).where(eq(games.id, parseInt(room.id)));
         return;
       }
@@ -565,15 +556,13 @@ class GameService {
       const maxVotedPerson = room.players.find(
         (player) => player.id === maxVotedPersonID
       )!;
-      this.usersList.forEach((user) => {
-        if (user.chatData?.roomId === room.id) {
-          this.sendServerMessage(
-            user.ws,
-            `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
-            { voting: false }
-          );
-        }
-      });
+      room.players.forEach((client) =>
+        this.sendServerMessage(
+          client.ws,
+          `${maxVotedPerson.chatData?.firstName} has been eliminated!`,
+          { voting: false }
+        )
+      );
       room.gameStatus.eliminatedPlayers.push(maxVotedPerson);
       const index = room.players.indexOf(maxVotedPerson);
       room.players.splice(index, 1);
@@ -589,17 +578,15 @@ class GameService {
     // check if in the room there is only one player (the game has ended)
     if (room.players.length <= 1) {
       room.gameStatus.finished = true;
-      this.usersList.forEach((user) => {
-        if (user.chatData?.roomId === room.id) {
-          this.sendServerMessage(
-            user.ws,
-            `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
-            {
-              finished: true,
-            }
-          );
-        }
-      });
+      room.players.forEach((client) =>
+        this.sendServerMessage(
+          client.ws,
+          `The game has finished! You lost 😭. The AI player was ${room.AIdata.firstName}`,
+          {
+            finished: true,
+          }
+        )
+      );
       await db.update(games).set({status: "lose"}).where(eq(games.id, parseInt(room.id)));
     } else {
       this.changeQuestioner(room);
