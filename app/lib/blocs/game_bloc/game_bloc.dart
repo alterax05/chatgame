@@ -67,6 +67,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     final webSocket = state.webSocket;
 
     if (webSocket != null) {
+      webSocket.sink.add(WebSocketEvent(EventType.disconnect, null).toJson());
       webSocket.sink.close();
       emit(const GameState());
       debugPrint("disconnected from room");
