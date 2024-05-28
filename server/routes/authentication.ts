@@ -27,6 +27,12 @@ router.post("/login", async (req: Request, res: Response) => {
     .where(eq(users.username, username))
     .limit(1);
 
+    
+  if(result.length === 0) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+
   const { password: hashedPassword } = result[0];
 
   if (hashedPassword && bcrypt.compareSync(password, hashedPassword)) {

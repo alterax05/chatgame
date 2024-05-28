@@ -17,6 +17,7 @@ app.use(express.json());
 const pathToPublic = path.join(__dirname, "/public");
 
 if (fs.existsSync(pathToPublic)) {
+  
   app.use(express.static(pathToPublic));
 
   // using express to expose the files in the public folder
@@ -25,8 +26,12 @@ if (fs.existsSync(pathToPublic)) {
   });
 }
 
-app.use(authentication);
-app.use(authMiddleware, chat);
+const apiRouter = express.Router();
+
+apiRouter.use(authentication);
+apiRouter.use(authMiddleware, chat);
+
+app.use("/api", apiRouter);
 
 const port = process.env.PORT || 3000;
 const server = app.listen(port, () => {

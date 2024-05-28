@@ -43,9 +43,6 @@ class RoomService {
     };
 
     this.rooms.push(room);
-    users.forEach((user) => {
-      user.chatData!.roomId = room.id;
-    });
 
     return room;
   }
@@ -83,6 +80,15 @@ class RoomService {
         room.players = room.players.filter((player) => player.id !== userId);
         if (room.players.length === 0) {
           this.removeRoom(room.id);
+        }
+        foundUser.chatData!.roomId = undefined;
+      }
+      else{
+        const foundUser = room.gameStatus.eliminatedPlayers.find((user) => user.id === userId);
+        if (foundUser) {
+          user = foundUser;
+          room.gameStatus.eliminatedPlayers = room.gameStatus.eliminatedPlayers.filter((player) => player.id !== userId);
+          foundUser.chatData!.roomId = undefined;
         }
       }
     }

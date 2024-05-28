@@ -320,14 +320,15 @@ class GameService {
   }
 
   public async addPlayerInMatchMaking(clientId: string, firstName: string) {
-    const client = this.usersList.find((client) => client.id === clientId);
+    const retrievedUserID = await db.select({id: users.id}).from(users).where(eq(users.username, firstName)).limit(1);
+    const client = this.usersList.find((client) => client.id === clientId || client.id === retrievedUserID[0].id.toString())
+
     if (
       !client ||
       this.matchMakingQueue.find((client) => client.id === clientId)
     )
       return;
     
-    const retrievedUserID = await db.select({id: users.id}).from(users).where(eq(users.username, firstName)).limit(1);
     
     if (retrievedUserID.length === 0) {
       return;
@@ -372,6 +373,10 @@ class GameService {
     const gameRecord = await db.insert(games).values({ status: "unknown" });
 
     const room = this.chatRoomManager.createRoom(players, gameRecord[0].insertId);
+
+    players.forEach((player) => {
+      player.chatData!.roomId = room.id;
+    });
 
     room.gameStatus.started = true;
     room.gameStatus.turnNumber = 1;
@@ -528,6 +533,11 @@ class GameService {
         })
       );
     });
+
+    this.chatRoomManager.removeUser(user.id);
+    user.ws.close();
+
+    this.usersList = this.usersList.filter((client) => client.id !== user.id);
 
     this.matchMakingQueue = this.matchMakingQueue.filter(
       (client) => client.id !== user.id
