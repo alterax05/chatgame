@@ -40,9 +40,9 @@ class _LoginPageState extends State<LoginPage> {
             content: Text('Invalid username or password'),
           ));
         }
-      }).catchError( (error) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('An error occurred'),
+      }).catchError((error) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('An error occurred: ${error.toString()}'),
         ));
       });
     }
