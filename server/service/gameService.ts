@@ -61,10 +61,7 @@ class GameService {
       .then((response) => {
         let message = response.choices[0].message.content ?? "idk. :P";
         // Is possible that the AI response contains some parentesis.
-        message =
-          message.indexOf(")") !== -1
-            ? message.slice(message.indexOf(")") + 2)
-            : message;
+        message = message.replace(")", "").replace("(", "").replace("]", "").replace("[", "");
         return message;
       })
       .catch((err) => {
@@ -129,10 +126,7 @@ class GameService {
         let message = response.choices[0].message.content ?? "idk. :P";
 
         // Is possible that the AI response contains some parentesis.
-        message =
-          message.indexOf(")") !== -1
-            ? message.slice(message.indexOf(")") + 2)
-            : message;
+        message = message = message.replace(")", "").replace("(", "").replace("]", "").replace("[", "");
 
         return message;
       })
