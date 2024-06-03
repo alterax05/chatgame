@@ -56,3 +56,6 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+#Top level .idea folder
+.idea/
